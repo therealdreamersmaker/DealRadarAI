@@ -218,76 +218,27 @@ export default function Dashboard({ data, loading, onScanMore, scanLoading, t })
       </div>
 
       {/* ── Listed (MLS) block ────────────────────────────────────────── */}
-      <div style={{ marginBottom: 28 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)',
-            borderRadius: 20, padding: '5px 14px', fontSize: 12, fontWeight: 700, color: '#4ade80',
-          }}>
-            ● {t('Listed On-Market', 'Listadas en Mercado')}
-          </div>
-          {listedOpps.length > 0 && (
+      {listedOpps.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)',
+              borderRadius: 20, padding: '5px 14px', fontSize: 12, fontWeight: 700, color: '#4ade80',
+            }}>
+              ● {t('Listed On-Market', 'Listadas en Mercado')}
+            </div>
             <span style={{ fontSize: 12, color: 'var(--dr-text-faintest)' }}>
               {listedOpps.length} {t('real MLS properties — live Zillow & Redfin links', 'propiedades MLS reales — enlaces en vivo a Zillow y Redfin')}
             </span>
-          )}
-        </div>
-
-        {listedOpps.length > 0 ? (
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
             {listedOpps.map((opp, i) => (
               <OpportunityCard key={`listed-${opp.address}-${i}`} opp={opp} index={i} t={t} />
             ))}
           </div>
-        ) : (
-          /* No RentCast key → setup prompt */
-          <div style={{
-            background: 'var(--dr-grad-card)',
-            border: '1px solid rgba(59,130,246,0.25)',
-            borderRadius: 16, padding: '28px 32px',
-            display: 'flex', alignItems: 'flex-start', gap: 20,
-          }}>
-            <span style={{ fontSize: 36, flexShrink: 0 }}>🔑</span>
-            <div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#93c5fd', marginBottom: 8 }}>
-                {t('Connect RentCast for Real MLS Listings', 'Conecta RentCast para Propiedades MLS Reales')}
-              </div>
-              <p style={{ fontSize: 13, color: 'var(--dr-text-faint)', lineHeight: 1.7, marginBottom: 16, maxWidth: 520 }}>
-                {t(
-                  'Real listed properties with accurate addresses and live Zillow/Redfin links require a free RentCast API key. Free tier: 50 requests/month.',
-                  'Las propiedades reales con direcciones exactas y enlaces en vivo a Zillow/Redfin requieren una clave API gratuita de RentCast. Nivel gratuito: 50 solicitudes/mes.',
-                )}
-              </p>
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                <a
-                  href="https://app.rentcast.io/login"
-                  target="_blank" rel="noopener noreferrer"
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 6,
-                    padding: '9px 18px', borderRadius: 8,
-                    background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.4)',
-                    color: '#60a5fa', textDecoration: 'none', fontSize: 12, fontWeight: 700,
-                  }}
-                >
-                  🌐 {t('Get Free API Key at rentcast.io', 'Obtener clave gratis en rentcast.io')}
-                </a>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '9px 14px', borderRadius: 8,
-                  background: 'var(--dr-surface-deep)', border: '1px solid var(--dr-border)',
-                  fontSize: 11, color: 'var(--dr-text-muted)', fontFamily: 'JetBrains Mono, monospace',
-                }}>
-                  RENTCAST_API_KEY=your_key
-                </div>
-              </div>
-              <div style={{ marginTop: 12, fontSize: 11, color: 'var(--dr-text-faintest)' }}>
-                {t('Add the key to Railway → Variables → then redeploy.', 'Agrega la clave en Railway → Variables → luego reimplementa.')}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* ── Off-Market block ──────────────────────────────────────────── */}
       {offMarketOpps.length > 0 && (
