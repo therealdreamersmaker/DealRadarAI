@@ -319,11 +319,33 @@ export default function AutopilotPanel({ t, API }) {
                 : t('Run the autopilot to populate this table.', 'Ejecuta el autopiloto para llenar esta tabla.')}
             </div>
           </div>
-          {s.lastExportUrl && (
-            <a href={`${API}${s.lastExportUrl}`} download style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 10, color: '#4ade80', textDecoration: 'none', fontSize: 12, fontWeight: 700 }}>
-              ⬇ {t('Download CSV', 'Descargar CSV')}
-            </a>
-          )}
+
+          {/* Export buttons — always visible; CSV greys out until data exists */}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {s.lastExportUrl ? (
+              <a
+                href={`${API}${s.lastExportUrl}`}
+                download
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 10, color: '#4ade80', textDecoration: 'none', fontSize: 12, fontWeight: 700 }}
+              >
+                ⬇ {t('Download CSV', 'Descargar CSV')}
+              </a>
+            ) : (
+              <div
+                title={t('Run the autopilot first to generate a CSV export', 'Ejecuta el autopiloto primero para generar un CSV')}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', background: 'var(--dr-surface-deep)', border: '1px solid var(--dr-border)', borderRadius: 10, color: 'var(--dr-text-faintest)', fontSize: 12, fontWeight: 700, cursor: 'not-allowed', userSelect: 'none' }}
+              >
+                ⬇ {t('Download CSV', 'Descargar CSV')}
+              </div>
+            )}
+            <button
+              onClick={() => window.print()}
+              title={t('Print leads table as PDF', 'Imprimir tabla de leads como PDF')}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 10, color: '#60a5fa', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}
+            >
+              🖨 {t('Print PDF', 'Imprimir PDF')}
+            </button>
+          </div>
         </div>
         <LeadsTable API={API} t={t} totalLeadsInState={s.totalLeadsProcessed} />
       </div>
