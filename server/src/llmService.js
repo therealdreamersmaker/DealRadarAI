@@ -20,7 +20,7 @@ function getGemini() {
 async function callGemini(prompt) {
   const ai = getGemini();
   const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     contents: prompt,
   });
   return response.text;
