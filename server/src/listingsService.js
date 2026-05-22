@@ -137,25 +137,72 @@ function mapListingToOpportunity(listing) {
 
 // ── Off-market AI stubs (clearly labelled) ───────────────────────────────────
 
+/**
+ * Build Google search URLs pointing to county/government records for each distress type.
+ * These are real, free public-record search links the user can click to find specific owners.
+ */
+function buildCountySearchInfo(type, city, state) {
+  const q = (query) => `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+  const loc = `${city} ${state}`;
+
+  const MAP = {
+    'Pre-Foreclosure': {
+      url:   q(`${loc} foreclosure lis pendens county clerk records`),
+      label: `${city} Pre-Foreclosure / Lis Pendens Records`,
+      tip:   'Check county clerk & recorder for lis pendens filings — these are homeowners 30–90 days behind on payments.',
+    },
+    'Probate': {
+      url:   q(`${loc} probate court property estate records`),
+      label: `${city} Probate Court Estate Records`,
+      tip:   'Probate courts list properties where heirs may need to sell quickly. Look for recently opened estates.',
+    },
+    'Tax Delinquency': {
+      url:   q(`${loc} delinquent property tax list county treasurer`),
+      label: `${city} Tax Delinquent Property List`,
+      tip:   'County treasurer websites publish tax delinquency lists — owners 2+ years behind are often highly motivated.',
+    },
+    'Absentee Owner': {
+      url:   q(`${loc} absentee owner out-of-state landlord county assessor`),
+      label: `${city} County Assessor — Absentee Owners`,
+      tip:   'County assessor databases let you filter by mailing address ≠ property address to find absentee landlords.',
+    },
+  };
+
+  return MAP[type] || {
+    url:   q(`${loc} distressed property records county`),
+    label: `${city} County Property Records`,
+    tip:   'Search county records for distressed properties in this area.',
+  };
+}
+
 function buildOffMarketStubs(location, count = 3) {
   // These are placeholder records — the UI labels them clearly as AI Lead Targets
   const types = ['Pre-Foreclosure', 'Probate', 'Tax Delinquency', 'Absentee Owner'];
-  return Array.from({ length: count }, (_, i) => ({
-    type:        types[i % types.length],
-    address:     null,          // no fake address
-    arv:         null,
-    targetOffer: null,
-    listPrice:   null,
-    daysOnMarket: null,
-    bedBath:     null,
-    sqft:        null,
-    isListed:    false,
-    mlsNumber:   null,
-    dataSource:  'ai-target',
-    zillowUrl:   null,
-    redfinUrl:   null,
-    note: `AI-identified off-market lead type for ${location}. Use skip-tracing to find specific properties of this distress category.`,
-  }));
+  const { city, state } = parseLocation(location);
+
+  return Array.from({ length: count }, (_, i) => {
+    const type   = types[i % types.length];
+    const county = buildCountySearchInfo(type, city || location, state || '');
+    return {
+      type,
+      address:     null,          // no fake address
+      arv:         null,
+      targetOffer: null,
+      listPrice:   null,
+      daysOnMarket: null,
+      bedBath:     null,
+      sqft:        null,
+      isListed:    false,
+      mlsNumber:   null,
+      dataSource:  'ai-target',
+      zillowUrl:   null,
+      redfinUrl:   null,
+      countySearchUrl:   county.url,
+      countySearchLabel: county.label,
+      countySearchTip:   county.tip,
+      note: `AI-identified off-market lead type for ${location}. Use skip-tracing to find specific properties of this distress category.`,
+    };
+  });
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────

@@ -2,6 +2,75 @@ import { motion } from 'framer-motion'
 
 const fmt = n => n != null ? `$${Number(n).toLocaleString()}` : '—'
 
+// ── Deal insight engine ───────────────────────────────────────────────────────
+function generateInsight(opp) {
+  const bullets = []
+  const actions = []
+
+  // Days on market
+  if (opp.daysOnMarket > 90) {
+    bullets.push(`🔥 ${opp.daysOnMarket} days on market — seller is highly motivated, deep discount likely`)
+    actions.push('Send a lowball offer today before another wholesaler does')
+  } else if (opp.daysOnMarket > 45) {
+    bullets.push(`⏳ ${opp.daysOnMarket} days on market — above-average DOM signals price reduction incoming`)
+    actions.push('Negotiate 10–15% below current ask')
+  } else if (opp.daysOnMarket > 20) {
+    bullets.push(`📅 ${opp.daysOnMarket} days on market — mild motivation, worth opening a conversation`)
+  }
+
+  // Year built
+  if (opp.yearBuilt && opp.yearBuilt < 1970) {
+    bullets.push(`🏚 Built ${opp.yearBuilt} — likely needs full rehab (roof, plumbing, electrical, foundation)`)
+    actions.push('Get contractor walk-through before submitting offer')
+  } else if (opp.yearBuilt && opp.yearBuilt < 1985) {
+    bullets.push(`🔨 Built ${opp.yearBuilt} — cosmetic + mechanical updates probable; budget accordingly`)
+  }
+
+  // Price per sqft
+  const ppsf = opp.sqft && opp.listPrice ? Math.round(opp.listPrice / opp.sqft) : null
+  if (ppsf !== null && ppsf < 60) {
+    bullets.push(`💰 Only $${ppsf}/sqft — well below market; exceptional value-add opportunity`)
+  } else if (ppsf !== null && ppsf < 100) {
+    bullets.push(`📊 $${ppsf}/sqft — below-market pricing creates meaningful profit room`)
+  }
+
+  // Estimated profit
+  const profit = opp.arv && opp.targetOffer ? opp.arv - opp.targetOffer : null
+  if (profit && profit >= 30000) {
+    bullets.push(`🚀 Est. $${Number(profit).toLocaleString()} wholesale profit at 70% ARV offer`)
+    actions.push('Assign contract to a cash buyer in your buyers list')
+  } else if (profit && profit >= 15000) {
+    bullets.push(`✅ Est. $${Number(profit).toLocaleString()} wholesale profit at 70% ARV offer`)
+  }
+
+  // Equity spread
+  const equity = opp.arv && opp.listPrice
+    ? Math.round(((opp.arv - opp.listPrice) / opp.arv) * 100) : null
+  if (equity && equity >= 25) {
+    bullets.push(`💎 ${equity}% spread between list price and ARV — strong equity play`)
+  }
+
+  // Deal-type specific
+  if (opp.type === 'Price Drop') {
+    bullets.push('📉 Price has already been cut — seller motivation is confirmed')
+    actions.push('Make an offer before price drops further or another buyer steps in')
+  } else if (opp.type === 'Fixer-Upper') {
+    actions.push('Pull comps for renovated properties within 0.5 miles to validate ARV')
+  } else if (opp.type === 'Extended DOM') {
+    actions.push('Call listing agent — ask if seller would consider creative financing')
+  }
+
+  // Sensible defaults
+  if (bullets.length === 0) {
+    bullets.push('📋 Standard listing — verify comps and run a full repair estimate before offering')
+  }
+  if (actions.length === 0) {
+    actions.push('Drive by the property and request disclosure documents from the agent')
+  }
+
+  return { bullets, actions }
+}
+
 const TYPE_STYLES = {
   'Price Drop':      { color: '#f87171', icon: '📉', bg: 'rgba(239,68,68,0.1)'    },
   'Fixer-Upper':     { color: '#fb923c', icon: '🔨', bg: 'rgba(249,115,22,0.1)'   },
@@ -97,6 +166,33 @@ function AILeadTargetCard({ opp, index, t }) {
         🔍 {t('Use BatchSkipTracing.com or PropStream to find specific owners', 'Usa BatchSkipTracing.com o PropStream para encontrar propietarios específicos')}
       </div>
 
+      {/* County records search link */}
+      {opp.countySearchUrl && (
+        <div style={{ marginBottom: 10 }}>
+          <a
+            href={opp.countySearchUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 7,
+              background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.25)',
+              borderRadius: 8, padding: '9px 12px',
+              color: '#c4b5fd', textDecoration: 'none', fontSize: 11, fontWeight: 700,
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(124,58,237,0.18)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(124,58,237,0.08)'}
+          >
+            🏛 {opp.countySearchLabel || t('Search County Records', 'Buscar Registros del Condado')}
+          </a>
+          {opp.countySearchTip && (
+            <div style={{ marginTop: 5, fontSize: 10, color: 'var(--dr-text-faintest)', lineHeight: 1.5, paddingLeft: 4 }}>
+              💡 {opp.countySearchTip}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Greyed-out search buttons — not listed, so not searchable */}
       <div className="no-print" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <div
@@ -190,10 +286,47 @@ export default function OpportunityCard({ opp, index, t }) {
       </div>
 
       {equity !== null && (
-        <div style={{ background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.18)', borderRadius: 8, padding: '6px 12px', marginBottom: 14, fontSize: 11, color: '#4ade80', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.18)', borderRadius: 8, padding: '6px 12px', marginBottom: 10, fontSize: 11, color: '#4ade80', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
           📈 {equity}% {t('potential equity spread', 'diferencial de equidad potencial')}
         </div>
       )}
+
+      {/* Deal insight panel */}
+      {(() => {
+        const { bullets, actions } = generateInsight(opp)
+        return (
+          <div style={{
+            background: 'rgba(34,197,94,0.06)',
+            border: '1px solid rgba(34,197,94,0.22)',
+            borderRadius: 10, padding: '11px 13px', marginBottom: 14,
+          }}>
+            <div style={{
+              fontSize: 10, fontWeight: 800, color: '#4ade80',
+              letterSpacing: '0.08em', marginBottom: 7,
+              display: 'flex', alignItems: 'center', gap: 5,
+            }}>
+              ✦ {t('DEAL INSIGHT', 'ANÁLISIS DEL DEAL')}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {bullets.map((b, i) => (
+                <div key={i} style={{ fontSize: 11, color: '#86efac', lineHeight: 1.55 }}>{b}</div>
+              ))}
+            </div>
+            {actions.length > 0 && (
+              <div style={{ marginTop: 9, paddingTop: 8, borderTop: '1px solid rgba(34,197,94,0.14)' }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: '#4ade80', letterSpacing: '0.08em', marginBottom: 5 }}>
+                  ▶ {t('NEXT STEP', 'PRÓXIMO PASO')}
+                </div>
+                {actions.map((a, i) => (
+                  <div key={i} style={{ fontSize: 11, color: '#4ade80', fontWeight: 600, lineHeight: 1.5 }}>
+                    → {a}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Search buttons */}
       <div className="no-print" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
