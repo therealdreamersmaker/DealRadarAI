@@ -7,7 +7,9 @@ import AutopilotPanel from './components/AutopilotPanel'
 import LandingHero from './components/LandingHero'
 import { AnimatePresence, motion } from 'framer-motion'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+// In production, Express serves both API and frontend on the same origin,
+// so relative URLs work. In dev, Vite proxies /api → localhost:3001.
+const API = import.meta.env.VITE_API_URL || ''
 
 export default function App() {
   const [language, setLanguage] = useState('en')
