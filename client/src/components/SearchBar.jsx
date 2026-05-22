@@ -10,7 +10,6 @@ export default function SearchBar({ onSearch, loading, t }) {
   const inputRef  = useRef(null)
   const dropRef   = useRef(null)
 
-  // Recompute suggestions as user types
   useEffect(() => {
     const list = getSuggestions(value)
     setSuggestions(list)
@@ -18,7 +17,6 @@ export default function SearchBar({ onSearch, loading, t }) {
     setHighlighted(-1)
   }, [value])
 
-  // Close dropdown on outside click
   useEffect(() => {
     function handleClick(e) {
       if (!dropRef.current?.contains(e.target) && !inputRef.current?.contains(e.target)) {
@@ -37,29 +35,17 @@ export default function SearchBar({ onSearch, loading, t }) {
 
   function handleSubmit(e) {
     e.preventDefault()
-    if (value.trim()) {
-      setShowDrop(false)
-      onSearch(value.trim())
-    }
+    if (value.trim()) { setShowDrop(false); onSearch(value.trim()) }
   }
 
   function handleKeyDown(e) {
     if (!showDrop) return
-    if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      setHighlighted(h => Math.min(h + 1, suggestions.length - 1))
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      setHighlighted(h => Math.max(h - 1, -1))
-    } else if (e.key === 'Enter' && highlighted >= 0) {
-      e.preventDefault()
-      handleSelect(suggestions[highlighted])
-    } else if (e.key === 'Escape') {
-      setShowDrop(false)
-    }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setHighlighted(h => Math.min(h + 1, suggestions.length - 1)) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setHighlighted(h => Math.max(h - 1, -1)) }
+    else if (e.key === 'Enter' && highlighted >= 0) { e.preventDefault(); handleSelect(suggestions[highlighted]) }
+    else if (e.key === 'Escape') { setShowDrop(false) }
   }
 
-  // Bold the matched portion of a suggestion
   function highlightMatch(text, query) {
     const idx = text.toLowerCase().indexOf(query.toLowerCase())
     if (idx === -1) return <span>{text}</span>
@@ -80,20 +66,13 @@ export default function SearchBar({ onSearch, loading, t }) {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      style={{ padding: '28px 0 20px' }}
-    >
+    <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} style={{ padding: '28px 0 20px' }}>
       <form onSubmit={handleSubmit} style={{ maxWidth: 680, margin: '0 auto' }}>
         <div style={{ position: 'relative' }}>
           {/* Input row */}
           <div style={{ display: 'flex', gap: 10 }}>
             <div style={{ flex: 1, position: 'relative' }}>
-              <span style={{
-                position: 'absolute', left: 16, top: '50%',
-                transform: 'translateY(-50%)', fontSize: 18, pointerEvents: 'none',
-              }}>
+              <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 18, pointerEvents: 'none' }}>
                 🔍
               </span>
               <input
@@ -108,17 +87,17 @@ export default function SearchBar({ onSearch, loading, t }) {
                 style={{
                   width: '100%',
                   padding: '14px 16px 14px 48px',
-                  background: '#0f172a',
-                  border: '1px solid #1e3a5f',
+                  background: 'var(--dr-surface)',
+                  border: '1px solid var(--dr-border-blue)',
                   borderRadius: showDrop ? '12px 12px 0 0' : 12,
-                  color: '#e2e8f0',
+                  color: 'var(--dr-text-2)',
                   fontSize: 15,
                   fontFamily: 'Inter, sans-serif',
                   outline: 'none',
-                  transition: 'border-color 0.2s',
+                  transition: 'border-color 0.2s, background 0.25s',
                 }}
                 onFocusCapture={e => e.target.style.borderColor = '#3b82f6'}
-                onBlur={e => e.target.style.borderColor = showDrop ? '#3b82f6' : '#1e3a5f'}
+                onBlur={e => e.target.style.borderColor = showDrop ? '#3b82f6' : 'var(--dr-border-blue)'}
               />
             </div>
 
@@ -129,27 +108,16 @@ export default function SearchBar({ onSearch, loading, t }) {
               whileTap={{ scale: 0.98 }}
               style={{
                 padding: '14px 28px',
-                background: loading ? '#1e3a5f' : 'linear-gradient(135deg, #2563eb, #7c3aed)',
-                border: 'none',
-                borderRadius: 12,
-                color: 'white',
-                fontWeight: 700,
-                fontSize: 14,
+                background: loading ? 'var(--dr-border-blue)' : 'linear-gradient(135deg, #2563eb, #7c3aed)',
+                border: 'none', borderRadius: 12,
+                color: 'white', fontWeight: 700, fontSize: 14,
                 cursor: loading ? 'not-allowed' : 'pointer',
-                fontFamily: 'Inter, sans-serif',
-                whiteSpace: 'nowrap',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                minWidth: 130,
-                justifyContent: 'center',
+                fontFamily: 'Inter, sans-serif', whiteSpace: 'nowrap',
+                display: 'flex', alignItems: 'center', gap: 8,
+                minWidth: 130, justifyContent: 'center',
               }}
             >
-              {loading ? (
-                <><Spinner /> {t('Scanning…', 'Escaneando…')}</>
-              ) : (
-                <>{t('Find Deals', 'Buscar Tratos')}</>
-              )}
+              {loading ? (<><Spinner /> {t('Scanning…', 'Escaneando…')}</>) : <>{t('Find Deals', 'Buscar Tratos')}</>}
             </motion.button>
           </div>
 
@@ -163,17 +131,12 @@ export default function SearchBar({ onSearch, loading, t }) {
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.12 }}
                 style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 130 + 10, // align with right edge of input (not button)
-                  background: '#0f172a',
+                  position: 'absolute', top: '100%', left: 0, right: 130 + 10,
+                  background: 'var(--dr-dropdown-bg)',
                   border: '1px solid #3b82f6',
-                  borderTop: 'none',
-                  borderRadius: '0 0 12px 12px',
-                  zIndex: 1000,
-                  overflow: 'hidden',
-                  boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+                  borderTop: 'none', borderRadius: '0 0 12px 12px',
+                  zIndex: 1000, overflow: 'hidden',
+                  boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
                 }}
               >
                 {suggestions.map((loc, i) => (
@@ -183,40 +146,33 @@ export default function SearchBar({ onSearch, loading, t }) {
                     onMouseLeave={() => setHighlighted(-1)}
                     onMouseDown={() => handleSelect(loc)}
                     style={{
-                      padding: '11px 16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
+                      padding: '11px 16px', display: 'flex', alignItems: 'center', gap: 10,
                       background: highlighted === i ? 'rgba(59,130,246,0.12)' : 'transparent',
-                      borderBottom: i < suggestions.length - 1 ? '1px solid #1e293b' : 'none',
-                      cursor: 'pointer',
-                      transition: 'background 0.1s',
+                      borderBottom: i < suggestions.length - 1 ? '1px solid var(--dr-border)' : 'none',
+                      cursor: 'pointer', transition: 'background 0.1s',
                     }}
                   >
                     <span style={{ fontSize: 16, flexShrink: 0 }}>{getIcon(loc)}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, color: '#cbd5e1', lineHeight: 1.3 }}>
+                      <div style={{ fontSize: 13, color: 'var(--dr-text-3)', lineHeight: 1.3 }}>
                         {highlightMatch(loc, value)}
                       </div>
-                      <div style={{ fontSize: 10, color: '#334155', marginTop: 2 }}>
+                      <div style={{ fontSize: 10, color: 'var(--dr-text-faintest)', marginTop: 2 }}>
                         {/\d{5}/.test(loc)
                           ? t('ZIP Code · Click to analyze', 'Código ZIP · Clic para analizar')
                           : t('Market · Click to analyze', 'Mercado · Clic para analizar')}
                       </div>
                     </div>
-                    <span style={{ fontSize: 11, color: '#1e3a5f', flexShrink: 0 }}>
+                    <span style={{ fontSize: 11, color: 'var(--dr-border-blue)', flexShrink: 0 }}>
                       {highlighted === i ? '↵' : ''}
                     </span>
                   </motion.div>
                 ))}
-
                 <div style={{
-                  padding: '7px 16px',
-                  fontSize: 10,
-                  color: '#1e3a5f',
-                  background: '#070b14',
-                  display: 'flex',
-                  gap: 16,
+                  padding: '7px 16px', fontSize: 10,
+                  color: 'var(--dr-text-faintest)',
+                  background: 'var(--dr-surface-deep)',
+                  display: 'flex', gap: 16,
                 }}>
                   <span>↑↓ {t('navigate', 'navegar')}</span>
                   <span>↵ {t('select', 'seleccionar')}</span>
@@ -229,11 +185,7 @@ export default function SearchBar({ onSearch, loading, t }) {
       </form>
 
       {loading && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          style={{ textAlign: 'center', marginTop: 12, color: '#3b82f6', fontSize: 13 }}
-        >
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ textAlign: 'center', marginTop: 12, color: '#3b82f6', fontSize: 13 }}>
           {t('AI is analyzing market data and finding distressed properties…', 'La IA está analizando datos del mercado y encontrando propiedades…')}
         </motion.div>
       )}

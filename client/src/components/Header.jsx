@@ -1,10 +1,13 @@
 import { motion } from 'framer-motion'
+import { useTheme } from '../ThemeContext'
 
 export default function Header({ language, setLanguage, t }) {
+  const { isDark, toggle } = useTheme()
+
   return (
     <header className="no-print" style={{
-      background: 'linear-gradient(180deg, #0a0f1e 0%, #070b14 100%)',
-      borderBottom: '1px solid #1e293b',
+      background: 'var(--dr-grad-nav)',
+      borderBottom: '1px solid var(--dr-border)',
       padding: '0 24px',
       position: 'sticky',
       top: 0,
@@ -27,20 +30,21 @@ export default function Header({ language, setLanguage, t }) {
             📡
           </div>
           <div>
-            <div style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.5px', color: '#f1f5f9' }}>
+            <div style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.5px', color: 'var(--dr-text-1)' }}>
               Deal<span style={{ color: '#3b82f6' }}>Radar</span> AI
             </div>
-            <div style={{ fontSize: 10, color: '#475569', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+            <div style={{ fontSize: 10, color: 'var(--dr-text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
               {t('Real Estate Intelligence', 'Inteligencia Inmobiliaria')}
             </div>
           </div>
         </motion.div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* Language toggle */}
           <div style={{
             display: 'flex',
-            background: '#0f172a',
-            border: '1px solid #1e293b',
+            background: 'var(--dr-surface)',
+            border: '1px solid var(--dr-border)',
             borderRadius: 8,
             overflow: 'hidden',
             fontSize: 12,
@@ -53,7 +57,7 @@ export default function Header({ language, setLanguage, t }) {
                 style={{
                   padding: '6px 14px',
                   background: language === lang ? '#2563eb' : 'transparent',
-                  color: language === lang ? 'white' : '#64748b',
+                  color: language === lang ? 'white' : 'var(--dr-text-muted)',
                   border: 'none',
                   cursor: 'pointer',
                   fontFamily: 'Inter, sans-serif',
@@ -68,6 +72,39 @@ export default function Header({ language, setLanguage, t }) {
             ))}
           </div>
 
+          {/* Dark / Light mode toggle */}
+          <button
+            onClick={toggle}
+            title={isDark ? t('Switch to light mode', 'Cambiar a modo claro') : t('Switch to dark mode', 'Cambiar a modo oscuro')}
+            style={{
+              width: 52, height: 28,
+              borderRadius: 14,
+              border: `1px solid ${isDark ? '#1e3a5f' : '#bfdbfe'}`,
+              background: isDark ? '#0f172a' : '#dbeafe',
+              cursor: 'pointer',
+              position: 'relative',
+              transition: 'background 0.3s, border-color 0.3s',
+              flexShrink: 0,
+            }}
+          >
+            <motion.div
+              animate={{ left: isDark ? 3 : 25 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+              style={{
+                position: 'absolute',
+                top: 3,
+                width: 20, height: 20,
+                borderRadius: '50%',
+                background: isDark ? '#1e3a5f' : '#fde68a',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 11,
+              }}
+            >
+              {isDark ? '🌙' : '☀️'}
+            </motion.div>
+          </button>
+
+          {/* Live indicator */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6,
             background: 'rgba(34,197,94,0.1)',

@@ -34,7 +34,7 @@ export default function LandingHero({ t }) {
       }}>
         {t('Your AI Wholesaling Intelligence Engine', 'Tu Motor de Inteligencia de Mayoreo IA')}
       </h1>
-      <p style={{ color: '#64748b', fontSize: 16, maxWidth: 520, margin: '0 auto 48px', lineHeight: 1.7 }}>
+      <p style={{ color: 'var(--dr-text-muted)', fontSize: 16, maxWidth: 520, margin: '0 auto 48px', lineHeight: 1.7 }}>
         {t(
           'Search any US market. Get real distressed properties, live market metrics, wholesale deal tiers, and an AI copilot — all powered by live web search.',
           'Busca cualquier mercado en EE.UU. Obtén propiedades reales, métricas de mercado en vivo, niveles de oferta al por mayor, y un copiloto IA.',
@@ -49,16 +49,16 @@ export default function LandingHero({ t }) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 + 0.3 }}
             style={{
-              background: 'linear-gradient(135deg, #0f172a, #0d1f3c)',
-              border: '1px solid #1e3a5f',
+              background: 'var(--dr-grad-card)',
+              border: '1px solid var(--dr-border-blue)',
               borderRadius: 16,
               padding: '24px 20px',
               textAlign: 'left',
             }}
           >
             <div style={{ fontSize: 28, marginBottom: 10 }}>{f.icon}</div>
-            <div style={{ fontWeight: 700, color: '#e2e8f0', marginBottom: 6, fontSize: 14 }}>{f.title}</div>
-            <div style={{ color: '#64748b', fontSize: 12, lineHeight: 1.5 }}>{f.desc}</div>
+            <div style={{ fontWeight: 700, color: 'var(--dr-text-1)', marginBottom: 6, fontSize: 14 }}>{f.title}</div>
+            <div style={{ color: 'var(--dr-text-muted)', fontSize: 12, lineHeight: 1.5 }}>{f.desc}</div>
           </motion.div>
         ))}
       </div>

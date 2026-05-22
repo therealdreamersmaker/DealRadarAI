@@ -7,8 +7,6 @@ import AutopilotPanel from './components/AutopilotPanel'
 import LandingHero from './components/LandingHero'
 import { AnimatePresence, motion } from 'framer-motion'
 
-// In production, Express serves both API and frontend on the same origin,
-// so relative URLs work. In dev, Vite proxies /api → localhost:3001.
 const API = import.meta.env.VITE_API_URL || ''
 
 export default function App() {
@@ -51,7 +49,7 @@ export default function App() {
     if (!dashboardData) return
     setScanLoading(true)
     try {
-      const existing = dashboardData.opportunities.map(o => o.address)
+      const existing = dashboardData.opportunities.map(o => o.address).filter(Boolean)
       const res = await fetch(`${API}/api/scan-more`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -77,7 +75,7 @@ export default function App() {
   ]
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#070b14' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--dr-page)' }}>
       <Header language={language} setLanguage={setLanguage} t={t} />
 
       <main style={{ flex: 1, maxWidth: 1400, margin: '0 auto', width: '100%', padding: '0 20px 40px' }}>
@@ -105,7 +103,7 @@ export default function App() {
 
         {(dashboardData || loading) && (
           <>
-            <div className="no-print" style={{ display: 'flex', gap: 8, marginBottom: 28, borderBottom: '1px solid #1e293b', paddingBottom: 0 }}>
+            <div className="no-print" style={{ display: 'flex', gap: 8, marginBottom: 28, borderBottom: '1px solid var(--dr-border)', paddingBottom: 0 }}>
               {tabs.map(tab => (
                 <button
                   key={tab.id}
@@ -115,7 +113,7 @@ export default function App() {
                     background: 'none',
                     border: 'none',
                     borderBottom: activeTab === tab.id ? '2px solid #3b82f6' : '2px solid transparent',
-                    color: activeTab === tab.id ? '#3b82f6' : '#64748b',
+                    color: activeTab === tab.id ? '#3b82f6' : 'var(--dr-text-muted)',
                     fontWeight: activeTab === tab.id ? 600 : 400,
                     fontSize: 14,
                     cursor: 'pointer',

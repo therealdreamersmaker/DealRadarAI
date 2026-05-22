@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useTheme } from '../ThemeContext'
 
 export default function Copilot({ dashboardData, language, t, API }) {
+  const { isDark } = useTheme()
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -24,11 +26,9 @@ export default function Copilot({ dashboardData, language, t, API }) {
     const userMsg = text || input.trim()
     if (!userMsg) return
     setInput('')
-
     const history = messages.slice(-10)
     setMessages(prev => [...prev, { role: 'user', content: userMsg }])
     setLoading(true)
-
     try {
       const res = await fetch(`${API}/api/chat`, {
         method: 'POST',
@@ -49,8 +49,8 @@ export default function Copilot({ dashboardData, language, t, API }) {
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 260px)', minHeight: 500 }}>
       {/* Header */}
       <div style={{
-        background: 'linear-gradient(135deg, #0f172a, #0d1f3c)',
-        border: '1px solid #1e3a5f',
+        background: 'var(--dr-grad-card)',
+        border: '1px solid var(--dr-border-blue)',
         borderRadius: '20px 20px 0 0',
         padding: '20px 24px',
         display: 'flex', alignItems: 'center', gap: 14,
@@ -63,8 +63,8 @@ export default function Copilot({ dashboardData, language, t, API }) {
           fontSize: 20,
         }}>🤖</div>
         <div>
-          <div style={{ fontWeight: 700, color: '#e2e8f0', fontSize: 15 }}>DealRadar Copilot</div>
-          <div style={{ fontSize: 12, color: '#475569' }}>
+          <div style={{ fontWeight: 700, color: 'var(--dr-text-2)', fontSize: 15 }}>DealRadar Copilot</div>
+          <div style={{ fontSize: 12, color: 'var(--dr-text-faint)' }}>
             {dashboardData
               ? t(`Analyzing ${dashboardData.city}, ${dashboardData.state} — ${dashboardData.opportunities?.length || 0} opportunities loaded`, `Analizando ${dashboardData.city}, ${dashboardData.state} — ${dashboardData.opportunities?.length || 0} oportunidades cargadas`)
               : t('Search a market first to enable full context', 'Busca un mercado primero para habilitar el contexto completo')}
@@ -83,17 +83,17 @@ export default function Copilot({ dashboardData, language, t, API }) {
       {/* Messages */}
       <div style={{
         flex: 1,
-        background: '#070b14',
-        border: '1px solid #1e293b',
+        background: 'var(--dr-surface-deep)',
+        border: '1px solid var(--dr-border)',
         borderTop: 'none',
         padding: '20px',
         overflowY: 'auto',
       }}>
         {messages.length === 0 && (
           <div>
-            <div style={{ textAlign: 'center', color: '#334155', marginBottom: 28, paddingTop: 20 }}>
+            <div style={{ textAlign: 'center', color: 'var(--dr-text-faintest)', marginBottom: 28, paddingTop: 20 }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>💬</div>
-              <div style={{ fontSize: 14, color: '#475569' }}>
+              <div style={{ fontSize: 14, color: 'var(--dr-text-faint)' }}>
                 {t('Ask anything about the market, properties, or deal strategy.', 'Pregunta cualquier cosa sobre el mercado, propiedades o estrategia de trato.')}
               </div>
             </div>
@@ -105,8 +105,8 @@ export default function Copilot({ dashboardData, language, t, API }) {
                   whileTap={{ scale: 0.99 }}
                   onClick={() => sendMessage(s)}
                   style={{
-                    background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12,
-                    padding: '12px 16px', color: '#94a3b8', fontSize: 13, textAlign: 'left',
+                    background: 'var(--dr-surface)', border: '1px solid var(--dr-border)', borderRadius: 12,
+                    padding: '12px 16px', color: 'var(--dr-text-muted)', fontSize: 13, textAlign: 'left',
                     cursor: 'pointer', fontFamily: 'Inter, sans-serif', lineHeight: 1.5,
                     transition: 'border-color 0.2s',
                   }}
@@ -124,11 +124,7 @@ export default function Copilot({ dashboardData, language, t, API }) {
               key={i}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              style={{
-                display: 'flex',
-                justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                marginBottom: 16,
-              }}
+              style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: 16 }}
             >
               {msg.role === 'assistant' && (
                 <div style={{
@@ -145,12 +141,10 @@ export default function Copilot({ dashboardData, language, t, API }) {
                 borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '4px 18px 18px 18px',
                 background: msg.role === 'user'
                   ? 'linear-gradient(135deg, #2563eb, #1d4ed8)'
-                  : msg.isError ? 'rgba(239,68,68,0.1)' : '#0f172a',
-                border: msg.role === 'assistant' ? `1px solid ${msg.isError ? 'rgba(239,68,68,0.3)' : '#1e293b'}` : 'none',
-                color: msg.isError ? '#fca5a5' : '#e2e8f0',
-                fontSize: 14,
-                lineHeight: 1.65,
-                whiteSpace: 'pre-wrap',
+                  : msg.isError ? 'rgba(239,68,68,0.1)' : 'var(--dr-surface)',
+                border: msg.role === 'assistant' ? `1px solid ${msg.isError ? 'rgba(239,68,68,0.3)' : 'var(--dr-border)'}` : 'none',
+                color: msg.isError ? '#fca5a5' : msg.role === 'user' ? 'white' : 'var(--dr-text-2)',
+                fontSize: 14, lineHeight: 1.65, whiteSpace: 'pre-wrap',
               }}>
                 {msg.content}
               </div>
@@ -159,7 +153,7 @@ export default function Copilot({ dashboardData, language, t, API }) {
         </AnimatePresence>
 
         {loading && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ display: 'flex', gap: 10, alignItems: 'center', color: '#475569', fontSize: 13 }}>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ display: 'flex', gap: 10, alignItems: 'center', color: 'var(--dr-text-faint)', fontSize: 13 }}>
             <div style={{
               width: 30, height: 30,
               background: 'linear-gradient(135deg, #2563eb, #7c3aed)',
@@ -181,8 +175,8 @@ export default function Copilot({ dashboardData, language, t, API }) {
 
       {/* Input */}
       <div style={{
-        background: '#0f172a',
-        border: '1px solid #1e293b',
+        background: 'var(--dr-surface)',
+        border: '1px solid var(--dr-border)',
         borderTop: 'none',
         borderRadius: '0 0 20px 20px',
         padding: '16px',
@@ -196,12 +190,13 @@ export default function Copilot({ dashboardData, language, t, API }) {
           disabled={loading}
           style={{
             flex: 1, padding: '12px 16px',
-            background: '#070b14', border: '1px solid #1e293b',
-            borderRadius: 12, color: '#e2e8f0', fontSize: 14,
+            background: 'var(--dr-surface-deep)', border: '1px solid var(--dr-border)',
+            borderRadius: 12, color: 'var(--dr-text-2)', fontSize: 14,
             fontFamily: 'Inter, sans-serif', outline: 'none',
+            transition: 'border-color 0.2s',
           }}
           onFocus={e => e.target.style.borderColor = '#3b82f6'}
-          onBlur={e => e.target.style.borderColor = '#1e293b'}
+          onBlur={e => e.target.style.borderColor = 'var(--dr-border)'}
         />
         <motion.button
           onClick={() => sendMessage()}
@@ -222,13 +217,8 @@ export default function Copilot({ dashboardData, language, t, API }) {
       </div>
 
       <style>{`
-        @keyframes bounce {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-6px); }
-        }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
     </div>
   )

@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, AreaChart, Area } from 'recharts'
 import OpportunityCard from './OpportunityCard'
 import MacroComparison from './MacroComparison'
+import { useTheme } from '../ThemeContext'
 
 const fmt = n => n != null ? `$${Number(n).toLocaleString()}` : '—'
 const pct = n => n != null ? `${Number(n).toFixed(1)}%` : '—'
@@ -13,18 +14,16 @@ function StatCard({ label, value, sub, color = '#3b82f6', icon }) {
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       style={{
-        background: 'linear-gradient(135deg, #0f172a, #0d1f3c)',
+        background: 'var(--dr-grad-card)',
         border: `1px solid ${color}33`,
-        borderRadius: 16,
-        padding: '20px 24px',
-        position: 'relative',
-        overflow: 'hidden',
+        borderRadius: 16, padding: '20px 24px',
+        position: 'relative', overflow: 'hidden',
       }}
     >
       <div style={{ position: 'absolute', top: 12, right: 16, fontSize: 24, opacity: 0.3 }}>{icon}</div>
-      <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>{label}</div>
+      <div style={{ fontSize: 11, color: 'var(--dr-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>{label}</div>
       <div style={{ fontSize: 26, fontWeight: 800, color, fontFamily: 'JetBrains Mono, monospace', letterSpacing: '-1px' }}>{value}</div>
-      {sub && <div style={{ fontSize: 12, color: '#475569', marginTop: 4 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 12, color: 'var(--dr-text-faint)', marginTop: 4 }}>{sub}</div>}
     </motion.div>
   )
 }
@@ -32,8 +31,8 @@ function StatCard({ label, value, sub, color = '#3b82f6', icon }) {
 function VerdictBadge({ verdict }) {
   const cfg = {
     'STRONG BUY': { bg: 'rgba(34,197,94,0.15)', border: 'rgba(34,197,94,0.5)', color: '#4ade80', icon: '🟢' },
-    'WATCHLIST': { bg: 'rgba(234,179,8,0.15)', border: 'rgba(234,179,8,0.5)', color: '#facc15', icon: '🟡' },
-    'AVOID': { bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.5)', color: '#f87171', icon: '🔴' },
+    'WATCHLIST':  { bg: 'rgba(234,179,8,0.15)',  border: 'rgba(234,179,8,0.5)',  color: '#facc15', icon: '🟡' },
+    'AVOID':      { bg: 'rgba(239,68,68,0.15)',  border: 'rgba(239,68,68,0.5)',  color: '#f87171', icon: '🔴' },
   }
   const c = cfg[verdict] || cfg['WATCHLIST']
   return (
@@ -51,6 +50,7 @@ const TIER_COLORS = ['#ef4444', '#f59e0b', '#22c55e']
 const TIER_LABELS = ['Aggressive', 'Moderate', 'Highest Acceptable']
 
 export default function Dashboard({ data, loading, onScanMore, scanLoading, t }) {
+  const { chart } = useTheme()
   if (loading) return <LoadingSkeleton />
   if (!data) return null
 
@@ -67,13 +67,13 @@ export default function Dashboard({ data, loading, onScanMore, scanLoading, t })
   return (
     <div>
       {/* Header */}
-      <div className="print-card" style={{ background: 'linear-gradient(135deg, #0a0f1e, #0d1f3c)', border: '1px solid #1e3a5f', borderRadius: 20, padding: '28px 32px', marginBottom: 20 }}>
+      <div className="print-card" style={{ background: 'var(--dr-grad-header-card)', border: '1px solid var(--dr-border-blue)', borderRadius: 20, padding: '28px 32px', marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
           <div>
-            <div style={{ fontSize: 11, color: '#475569', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>
+            <div style={{ fontSize: 11, color: 'var(--dr-text-muted)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>
               {t('Market Intelligence Report', 'Informe de Inteligencia de Mercado')}
             </div>
-            <h1 style={{ fontSize: 'clamp(22px, 4vw, 36px)', fontWeight: 900, color: '#f1f5f9', letterSpacing: '-1.5px', marginBottom: 12 }}>
+            <h1 style={{ fontSize: 'clamp(22px, 4vw, 36px)', fontWeight: 900, color: 'var(--dr-text-1)', letterSpacing: '-1.5px', marginBottom: 12 }}>
               {city}{state ? `, ${state}` : ''}
             </h1>
             <VerdictBadge verdict={verdict} />
@@ -82,8 +82,8 @@ export default function Dashboard({ data, loading, onScanMore, scanLoading, t })
             <button
               onClick={() => window.print()}
               style={{
-                padding: '10px 18px', background: '#0f172a', border: '1px solid #1e3a5f',
-                borderRadius: 10, color: '#94a3b8', fontSize: 13, fontWeight: 600,
+                padding: '10px 18px', background: 'var(--dr-surface)', border: '1px solid var(--dr-border-blue)',
+                borderRadius: 10, color: 'var(--dr-text-muted)', fontSize: 13, fontWeight: 600,
                 cursor: 'pointer', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', gap: 6,
               }}
             >
@@ -94,16 +94,16 @@ export default function Dashboard({ data, loading, onScanMore, scanLoading, t })
 
         <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
           <div style={{ background: 'rgba(59,130,246,0.08)', borderRadius: 12, padding: '16px 20px', border: '1px solid rgba(59,130,246,0.15)' }}>
-            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+            <div style={{ fontSize: 11, color: 'var(--dr-text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
               {t('Analysis', 'Análisis')}
             </div>
-            <p style={{ color: '#cbd5e1', fontSize: 14, lineHeight: 1.7 }}>{rationale}</p>
+            <p style={{ color: 'var(--dr-text-3)', fontSize: 14, lineHeight: 1.7 }}>{rationale}</p>
           </div>
           <div style={{ background: 'rgba(124,58,237,0.08)', borderRadius: 12, padding: '16px 20px', border: '1px solid rgba(124,58,237,0.15)' }}>
-            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+            <div style={{ fontSize: 11, color: 'var(--dr-text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
               {t('Wholesaling Plan', 'Plan de Mayoreo')}
             </div>
-            <p style={{ color: '#cbd5e1', fontSize: 14, lineHeight: 1.7 }}>{wholesalingPlan}</p>
+            <p style={{ color: 'var(--dr-text-3)', fontSize: 14, lineHeight: 1.7 }}>{wholesalingPlan}</p>
           </div>
         </div>
       </div>
@@ -128,13 +128,10 @@ export default function Dashboard({ data, loading, onScanMore, scanLoading, t })
                     <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="month" tick={{ fill: '#64748b', fontSize: 10 }} />
-                <YAxis tick={{ fill: '#64748b', fontSize: 10 }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
-                <Tooltip
-                  contentStyle={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 8 }}
-                  formatter={v => [fmt(v), t('Median Price', 'Precio Mediano')]}
-                />
+                <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+                <XAxis dataKey="month" tick={{ fill: chart.tick, fontSize: 10 }} />
+                <YAxis tick={{ fill: chart.tick, fontSize: 10 }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
+                <Tooltip contentStyle={{ background: chart.bg, border: `1px solid ${chart.border}`, borderRadius: 8 }} formatter={v => [fmt(v), t('Median Price', 'Precio Mediano')]} />
                 <Area type="monotone" dataKey="medianPrice" stroke="#3b82f6" fill="url(#priceGrad)" strokeWidth={2} dot={{ fill: '#3b82f6', r: 3 }} />
               </AreaChart>
             </ResponsiveContainer>
@@ -149,13 +146,10 @@ export default function Dashboard({ data, loading, onScanMore, scanLoading, t })
                     <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="month" tick={{ fill: '#64748b', fontSize: 10 }} />
-                <YAxis tick={{ fill: '#64748b', fontSize: 10 }} />
-                <Tooltip
-                  contentStyle={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 8 }}
-                  formatter={v => [v, t('Days on Market', 'Días en Mercado')]}
-                />
+                <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+                <XAxis dataKey="month" tick={{ fill: chart.tick, fontSize: 10 }} />
+                <YAxis tick={{ fill: chart.tick, fontSize: 10 }} />
+                <Tooltip contentStyle={{ background: chart.bg, border: `1px solid ${chart.border}`, borderRadius: 8 }} formatter={v => [v, t('Days on Market', 'Días en Mercado')]} />
                 <Area type="monotone" dataKey="daysOnMarket" stroke="#8b5cf6" fill="url(#domGrad)" strokeWidth={2} dot={{ fill: '#8b5cf6', r: 3 }} />
               </AreaChart>
             </ResponsiveContainer>
@@ -165,7 +159,7 @@ export default function Dashboard({ data, loading, onScanMore, scanLoading, t })
 
       {/* Deal Tiers */}
       {dealTiers.length > 0 && (
-        <div className="print-card" style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 20, padding: '24px', marginBottom: 20 }}>
+        <div className="print-card" style={{ background: 'var(--dr-surface)', border: '1px solid var(--dr-border)', borderRadius: 20, padding: '24px', marginBottom: 20 }}>
           <SectionTitle>{t('Wholesale Deal Tiers', 'Niveles de Oferta al Por Mayor')}</SectionTitle>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
             {dealTiers.map((tier, i) => (
@@ -174,30 +168,22 @@ export default function Dashboard({ data, loading, onScanMore, scanLoading, t })
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.1 }}
-                style={{
-                  background: '#070b14',
-                  border: `1px solid ${TIER_COLORS[i]}44`,
-                  borderRadius: 14,
-                  padding: '20px',
-                }}
+                style={{ background: 'var(--dr-surface-deep)', border: `1px solid ${TIER_COLORS[i]}44`, borderRadius: 14, padding: '20px' }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                   <span style={{ fontSize: 12, fontWeight: 700, color: TIER_COLORS[i] }}>{tier.tier}</span>
-                  <span style={{
-                    fontSize: 10, padding: '3px 8px', borderRadius: 20,
-                    background: `${TIER_COLORS[i]}22`, color: TIER_COLORS[i], fontWeight: 600,
-                  }}>
+                  <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 20, background: `${TIER_COLORS[i]}22`, color: TIER_COLORS[i], fontWeight: 600 }}>
                     {TIER_LABELS[i]}
                   </span>
                 </div>
                 {[
                   [t('Target Offer', 'Oferta Objetivo'), fmt(tier.targetOffer), TIER_COLORS[i]],
-                  [t('Low Anchor', 'Ancla Baja'), fmt(tier.lowAnchor), '#64748b'],
-                  [t('Max Cap', 'Tope Máximo'), fmt(tier.maxCap), '#64748b'],
+                  [t('Low Anchor', 'Ancla Baja'), fmt(tier.lowAnchor), 'var(--dr-text-muted)'],
+                  [t('Max Cap', 'Tope Máximo'), fmt(tier.maxCap), 'var(--dr-text-muted)'],
                   [t('Expected Profit', 'Ganancia Esperada'), fmt(tier.expectedProfit), '#22c55e'],
                 ].map(([label, val, color]) => (
-                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid #1e293b' }}>
-                    <span style={{ fontSize: 12, color: '#64748b' }}>{label}</span>
+                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--dr-border)' }}>
+                    <span style={{ fontSize: 12, color: 'var(--dr-text-muted)' }}>{label}</span>
                     <span style={{ fontSize: 13, fontWeight: 700, color, fontFamily: 'JetBrains Mono, monospace' }}>{val}</span>
                   </div>
                 ))}
@@ -211,7 +197,7 @@ export default function Dashboard({ data, loading, onScanMore, scanLoading, t })
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <SectionTitle>
           {t('Actionable Opportunities', 'Oportunidades de Acción')}
-          <span style={{ fontSize: 13, color: '#475569', fontWeight: 400, marginLeft: 8 }}>({opportunities.length})</span>
+          <span style={{ fontSize: 13, color: 'var(--dr-text-faint)', fontWeight: 400, marginLeft: 8 }}>({opportunities.length})</span>
         </SectionTitle>
         <button
           onClick={onScanMore}
@@ -219,7 +205,7 @@ export default function Dashboard({ data, loading, onScanMore, scanLoading, t })
           className="no-print"
           style={{
             padding: '10px 20px',
-            background: scanLoading ? '#1e3a5f' : 'linear-gradient(135deg, #0f4c8a, #1d3a8a)',
+            background: scanLoading ? 'var(--dr-border-blue)' : 'linear-gradient(135deg, #0f4c8a, #1d3a8a)',
             border: '1px solid #2563eb44', borderRadius: 10,
             color: '#93c5fd', fontSize: 13, fontWeight: 600,
             cursor: scanLoading ? 'not-allowed' : 'pointer',
@@ -242,7 +228,7 @@ export default function Dashboard({ data, loading, onScanMore, scanLoading, t })
             ● {t('Listed On-Market', 'Listadas en Mercado')}
           </div>
           {listedOpps.length > 0 && (
-            <span style={{ fontSize: 12, color: '#334155' }}>
+            <span style={{ fontSize: 12, color: 'var(--dr-text-faintest)' }}>
               {listedOpps.length} {t('real MLS properties — live Zillow & Redfin links', 'propiedades MLS reales — enlaces en vivo a Zillow y Redfin')}
             </span>
           )}
@@ -255,9 +241,9 @@ export default function Dashboard({ data, loading, onScanMore, scanLoading, t })
             ))}
           </div>
         ) : (
-          /* No RentCast key → show setup prompt */
+          /* No RentCast key → setup prompt */
           <div style={{
-            background: 'linear-gradient(135deg, #0f172a, #0a1020)',
+            background: 'var(--dr-grad-card)',
             border: '1px solid rgba(59,130,246,0.25)',
             borderRadius: 16, padding: '28px 32px',
             display: 'flex', alignItems: 'flex-start', gap: 20,
@@ -267,7 +253,7 @@ export default function Dashboard({ data, loading, onScanMore, scanLoading, t })
               <div style={{ fontSize: 15, fontWeight: 700, color: '#93c5fd', marginBottom: 8 }}>
                 {t('Connect RentCast for Real MLS Listings', 'Conecta RentCast para Propiedades MLS Reales')}
               </div>
-              <p style={{ fontSize: 13, color: '#475569', lineHeight: 1.7, marginBottom: 16, maxWidth: 520 }}>
+              <p style={{ fontSize: 13, color: 'var(--dr-text-faint)', lineHeight: 1.7, marginBottom: 16, maxWidth: 520 }}>
                 {t(
                   'Real listed properties with accurate addresses and live Zillow/Redfin links require a free RentCast API key. Free tier: 50 requests/month.',
                   'Las propiedades reales con direcciones exactas y enlaces en vivo a Zillow/Redfin requieren una clave API gratuita de RentCast. Nivel gratuito: 50 solicitudes/mes.',
@@ -276,8 +262,7 @@ export default function Dashboard({ data, loading, onScanMore, scanLoading, t })
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                 <a
                   href="https://app.rentcast.io/login"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  target="_blank" rel="noopener noreferrer"
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 6,
                     padding: '9px 18px', borderRadius: 8,
@@ -290,13 +275,13 @@ export default function Dashboard({ data, loading, onScanMore, scanLoading, t })
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '9px 14px', borderRadius: 8,
-                  background: 'rgba(15,23,42,0.8)', border: '1px solid #1e293b',
-                  fontSize: 11, color: '#64748b', fontFamily: 'JetBrains Mono, monospace',
+                  background: 'var(--dr-surface-deep)', border: '1px solid var(--dr-border)',
+                  fontSize: 11, color: 'var(--dr-text-muted)', fontFamily: 'JetBrains Mono, monospace',
                 }}>
                   RENTCAST_API_KEY=your_key
                 </div>
               </div>
-              <div style={{ marginTop: 12, fontSize: 11, color: '#334155' }}>
+              <div style={{ marginTop: 12, fontSize: 11, color: 'var(--dr-text-faintest)' }}>
                 {t('Add the key to Railway → Variables → then redeploy.', 'Agrega la clave en Railway → Variables → luego reimplementa.')}
               </div>
             </div>
@@ -315,13 +300,13 @@ export default function Dashboard({ data, loading, onScanMore, scanLoading, t })
             }}>
               ◆ {t('Off-Market Leads', 'Leads Fuera de Mercado')}
             </div>
-            <span style={{ fontSize: 12, color: '#334155' }}>
-              {offMarketOpps.length} {t('distressed properties — direct owner contact required', 'propiedades en dificultad — requieren contacto directo con propietario')}
+            <span style={{ fontSize: 12, color: 'var(--dr-text-faintest)' }}>
+              {offMarketOpps.length} {t('distressed lead types — skip-trace to find owners', 'tipos de leads en dificultad — skip-trace para encontrar propietarios')}
             </span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
             {offMarketOpps.map((opp, i) => (
-              <OpportunityCard key={`offmkt-${opp.address}-${i}`} opp={opp} index={listedOpps.length + i} t={t} />
+              <OpportunityCard key={`offmkt-${opp.type}-${i}`} opp={opp} index={listedOpps.length + i} t={t} />
             ))}
           </div>
         </div>
@@ -329,26 +314,25 @@ export default function Dashboard({ data, loading, onScanMore, scanLoading, t })
 
       {/* ── Macro Market Comparison ───────────────────────────────────── */}
       <MacroComparison macro={macroComparison} localMetrics={metrics} t={t} />
-
     </div>
   )
 }
 
 function ChartCard({ title, color, children }) {
   return (
-    <div className="print-card" style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 16, padding: '20px' }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: color, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16 }}>{title}</div>
+    <div className="print-card" style={{ background: 'var(--dr-surface)', border: '1px solid var(--dr-border)', borderRadius: 16, padding: '20px' }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16 }}>{title}</div>
       {children}
     </div>
   )
 }
 
 function SectionTitle({ children }) {
-  return <h2 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', marginBottom: 16 }}>{children}</h2>
+  return <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--dr-text-1)', marginBottom: 16 }}>{children}</h2>
 }
 
 function LoadingSkeleton() {
-  const pulse = { animation: 'pulse 1.5s ease-in-out infinite', background: 'linear-gradient(90deg, #0f172a 25%, #1e293b 50%, #0f172a 75%)' }
+  const pulse = { animation: 'pulse 1.5s ease-in-out infinite', background: 'linear-gradient(90deg, var(--dr-surface) 25%, var(--dr-surface-mid) 50%, var(--dr-surface) 75%)' }
   return (
     <div>
       <div style={{ ...pulse, height: 160, borderRadius: 20, marginBottom: 20 }} />
@@ -361,12 +345,8 @@ function LoadingSkeleton() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
         {[...Array(3)].map((_, i) => <div key={i} style={{ ...pulse, height: 200, borderRadius: 16 }} />)}
       </div>
-
       <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 0.6; }
-          50% { opacity: 1; }
-        }
+        @keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
       `}</style>
     </div>
   )
