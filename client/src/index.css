@@ -1,0 +1,22 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root {
+  height: 100%;
+  font-family: 'Inter', system-ui, sans-serif;
+  background: #070b14;
+  color: #e2e8f0;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root { width: 100%; min-height: 100%; display: flex; flex-direction: column; }
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #0d1526; }
+::-webkit-scrollbar-thumb { background: #1e3a5f; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #2563eb; }
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white !important; color: #111 !important; }
+  .print-card { background: #f8fafc !important; border: 1px solid #e2e8f0 !important; color: #111 !important; page-break-inside: avoid; }
+}

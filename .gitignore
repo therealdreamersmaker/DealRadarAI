@@ -1,0 +1,11 @@
+node_modules/
+server/node_modules/
+client/node_modules/
+server/public/
+dist/
+.env
+logs/
+exports/
+*.csv
+*.xlsx
+.DS_Store
