@@ -4,6 +4,7 @@ client/node_modules/
 server/public/
 dist/
 .env
+server/.env
 logs/
 exports/
 *.csv

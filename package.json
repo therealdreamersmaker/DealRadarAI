@@ -1,11 +1,15 @@
 {
   "name": "dealradar-ai",
   "version": "1.0.0",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
+    "build": "cd client && npm install && npm run build",
+    "start": "cd server && node src/index.js",
+    "install:server": "cd server && npm install",
+    "postinstall": "cd server && npm install",
     "dev:server": "cd server && npm run dev",
-    "dev:client": "cd client && npm run dev",
-    "build:client": "cd client && npm run build",
-    "install:all": "cd server && npm install && cd ../client && npm install",
-    "start": "cd server && node src/index.js"
+    "dev:client": "cd client && npm run dev"
   }
 }
