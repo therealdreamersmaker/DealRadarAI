@@ -44,8 +44,12 @@ async function callGemini(prompt) {
 
   const response = await axios.post(
     `${GEMINI_URL}?key=${apiKey}`,
-    { contents: [{ parts: [{ text: prompt }] }] },
-    { headers: { 'Content-Type': 'application/json' }, timeout: 120000 }
+    {
+      contents: [{ parts: [{ text: prompt }] }],
+      // Disable extended thinking to keep latency under Railway's proxy timeout
+      generationConfig: { thinkingConfig: { thinkingBudget: 0 } },
+    },
+    { headers: { 'Content-Type': 'application/json' }, timeout: 90000 }
   );
 
   const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
