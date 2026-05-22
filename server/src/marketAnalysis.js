@@ -1,4 +1,5 @@
 const { generateText } = require('./llmService');
+const { getOpportunities, hasRentcast } = require('./listingsService');
 
 function buildMarketPrompt(location, language) {
   const langInstruction = language === 'es'
@@ -10,15 +11,6 @@ function buildMarketPrompt(location, language) {
 ${langInstruction}
 
 Return ONLY a single valid JSON object — no markdown, no code fences, no commentary — just raw JSON.
-
-IMPORTANT for opportunities:
-- Generate BOTH listed (on MLS/Zillow/Redfin) AND non-listed (off-market) properties.
-- "isListed": true means it is currently active on MLS and searchable on Zillow/Redfin.
-- "isListed": false means it is off-market (pre-foreclosure, probate, tax delinquency, absentee owner, etc.).
-- For listed properties, set "mlsNumber" to a realistic MLS number (e.g. "MLS# 7312045").
-- For non-listed, set "mlsNumber" to null.
-- Use realistic addresses that actually exist in this location.
-- Generate at least 3 listed and at least 2 non-listed properties (7 total).
 
 Schema:
 {
@@ -37,20 +29,6 @@ Schema:
     { "tier": "Tier 1 – Aggressive",        "targetOffer": number, "lowAnchor": number, "maxCap": number, "expectedProfit": number },
     { "tier": "Tier 2 – Moderate",           "targetOffer": number, "lowAnchor": number, "maxCap": number, "expectedProfit": number },
     { "tier": "Tier 3 – Highest Acceptable", "targetOffer": number, "lowAnchor": number, "maxCap": number, "expectedProfit": number }
-  ],
-  "opportunities": [
-    {
-      "type": "string (Price Drop | Fixer-Upper | Pre-Foreclosure | Probate | Tax Delinquency | Absentee Owner | High Equity)",
-      "address": "string — realistic full street address",
-      "arv": number,
-      "targetOffer": number,
-      "listPrice": number,
-      "daysOnMarket": number,
-      "bedBath": "string e.g. 3bd/2ba",
-      "sqft": number,
-      "isListed": boolean,
-      "mlsNumber": "string or null"
-    }
   ],
   "trends": [
     { "month": "string", "medianPrice": number, "daysOnMarket": number }
@@ -88,10 +66,6 @@ Schema:
 }
 
 Rules:
-- opportunities: 7 total — at least 3 with isListed:true, at least 2 with isListed:false
-- Listed types: "Price Drop", "Fixer-Upper", "High Equity" — these appear on MLS
-- Non-listed types: "Pre-Foreclosure", "Probate", "Tax Delinquency", "Absentee Owner"
-- targetOffer = 70% of arv, listPrice < arv
 - trends: last 6 months chronological
 - dealTiers: T1 = 58% of medianSalePrice, T2 = 65%, T3 = 70%
 - lowAnchor = targetOffer × 0.92, maxCap = targetOffer × 1.08
@@ -109,50 +83,87 @@ function buildScanMorePrompt(location, existingAddresses, language) {
     ? `Do NOT repeat these addresses: ${existingAddresses.join('; ')}`
     : '';
 
-  return `You are a real estate distressed property specialist. Find 4 MORE property opportunities in "${location}".
+  return `You are a real estate distressed property specialist. Find 4 MORE off-market distressed property lead types in "${location}".
 
 ${langInstruction}
 ${avoidList}
 
-Generate a mix of listed (isListed:true) and off-market (isListed:false) properties.
+IMPORTANT: These are off-market leads — do NOT invent specific street addresses. Return lead type records only.
 
 Return ONLY a raw JSON array of exactly 4 objects — no markdown, no code fences:
 [
   {
-    "type": "string (Price Drop | Fixer-Upper | Pre-Foreclosure | Probate | Tax Delinquency | Absentee Owner | High Equity)",
-    "address": "string — realistic full street address in ${location}",
-    "arv": number,
-    "targetOffer": number,
-    "listPrice": number,
-    "daysOnMarket": number,
-    "bedBath": "string",
-    "sqft": number,
-    "isListed": boolean,
-    "mlsNumber": "string or null"
+    "type": "string (Pre-Foreclosure | Probate | Tax Delinquency | Absentee Owner)",
+    "address": null,
+    "arv": null,
+    "targetOffer": null,
+    "listPrice": null,
+    "daysOnMarket": null,
+    "bedBath": null,
+    "sqft": null,
+    "isListed": false,
+    "mlsNumber": null,
+    "dataSource": "ai-target",
+    "zillowUrl": null,
+    "redfinUrl": null,
+    "note": "string — brief guidance on how to find and approach this distress category in ${location}"
   }
 ]
 
-Rules: targetOffer = 70% of arv. listPrice < arv. Mix listed and off-market. Return ONLY the JSON array.`;
+Rules: Vary the types. Return ONLY the JSON array.`;
 }
 
 async function analyzeMarket(location, language = 'en') {
-  const prompt  = buildMarketPrompt(location, language);
-  const raw     = await generateText(prompt);
-  const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-  const start   = cleaned.indexOf('{');
-  const end     = cleaned.lastIndexOf('}');
-  if (start === -1 || end === -1) throw new Error('No JSON object found in LLM response');
-  return JSON.parse(cleaned.slice(start, end + 1));
+  // Run AI market analysis and real MLS listings fetch in parallel
+  const [aiResult, listingsResult] = await Promise.all([
+    (async () => {
+      const prompt  = buildMarketPrompt(location, language);
+      const raw     = await generateText(prompt);
+      const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const start   = cleaned.indexOf('{');
+      const end     = cleaned.lastIndexOf('}');
+      if (start === -1 || end === -1) throw new Error('No JSON object found in LLM response');
+      return JSON.parse(cleaned.slice(start, end + 1));
+    })(),
+    getOpportunities(location).catch(err => {
+      console.error('[marketAnalysis] listingsService error:', err.message);
+      return { listed: [], offMarket: [] };
+    }),
+  ]);
+
+  // Merge: AI provides market intelligence (verdict, metrics, trends, macroComparison, dealTiers)
+  //        RentCast provides 100% real MLS listed properties
+  //        listingsService provides clearly-labelled off-market lead types (no fake addresses)
+  const allOpportunities = [
+    ...listingsResult.listed,    // Real MLS data (isListed: true, dataSource: 'live', real addresses)
+    ...listingsResult.offMarket, // AI lead type stubs (isListed: false, dataSource: 'ai-target', address: null)
+  ];
+
+  return {
+    ...aiResult,
+    opportunities: allOpportunities,
+    _hasRentcast: hasRentcast(),
+  };
 }
 
 async function scanMoreOpportunities(location, existingAddresses = [], language = 'en') {
+  // Scan More fetches additional off-market lead types (clearly labelled, no fake addresses)
   const prompt  = buildScanMorePrompt(location, existingAddresses, language);
   const raw     = await generateText(prompt);
   const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   const start   = cleaned.indexOf('[');
   const end     = cleaned.lastIndexOf(']');
   if (start === -1 || end === -1) throw new Error('No JSON array found in LLM response');
-  return JSON.parse(cleaned.slice(start, end + 1));
+  const results = JSON.parse(cleaned.slice(start, end + 1));
+  // Ensure all fields are correctly set (AI may hallucinate addresses despite instructions)
+  return results.map(r => ({
+    ...r,
+    address:    null,
+    isListed:   false,
+    dataSource: 'ai-target',
+    zillowUrl:  null,
+    redfinUrl:  null,
+  }));
 }
 
 module.exports = { analyzeMarket, scanMoreOpportunities };

@@ -8,6 +8,7 @@ const fs = require('fs');
 const { analyzeMarket, scanMoreOpportunities } = require('./marketAnalysis');
 const { generateChat } = require('./llmService');
 const { runAutopilot, getState, getLeads, EXPORTS_DIR } = require('./autopilot');
+const { hasRentcast } = require('./listingsService');
 
 const app = express();
 app.use(cors());
@@ -22,12 +23,15 @@ if (fs.existsSync(PUBLIC_DIR)) {
 // ── Health / diagnostics ─────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   const key = process.env.GEMINI_API_KEY || '';
+  const rKey = process.env.RENTCAST_API_KEY || '';
   res.json({
     status: 'ok',
     provider: process.env.LLM_PROVIDER || 'auto',
     geminiKeySet: key.length > 0,
     geminiKeyLength: key.length,
     geminiKeyPreview: key.length > 8 ? `${key.slice(0, 8)}...${key.slice(-4)}` : '(not set)',
+    rentcastEnabled: hasRentcast(),
+    rentcastKeyPreview: rKey.length > 8 ? `${rKey.slice(0, 6)}...` : '(not set)',
     nodeVersion: process.version,
     env: process.env.NODE_ENV || 'development',
   });
