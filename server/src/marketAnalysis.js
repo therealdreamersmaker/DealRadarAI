@@ -1,23 +1,25 @@
-const { generateWithSearch } = require('./llmService');
+const { generateText } = require('./llmService');
 
 function buildMarketPrompt(location, language) {
   const langInstruction = language === 'es'
     ? 'Return all string values in Spanish except property addresses and numeric data.'
     : 'Return all string values in English.';
 
-  return `You are a real estate market intelligence AI. Use your live web search capability to research current real estate data for: "${location}".
+  return `You are a senior real estate market intelligence analyst with deep expertise in US wholesale real estate. Analyze the market for: "${location}".
 
 ${langInstruction}
 
-Search the web for current (2024-2025) real estate market data for this location and return a SINGLE valid JSON object with NO markdown, no code fences, no extra text — only raw JSON.
+Using your comprehensive knowledge of US real estate markets, generate a detailed market analysis report. For the "opportunities" array, create realistic distressed property listings with REAL-STYLE street addresses that actually exist in this location (use your knowledge of actual street names, neighborhoods, and address formats for this specific city/area).
 
-The JSON must follow this exact schema:
+Return ONLY a single valid JSON object — no markdown, no code fences, no commentary — just raw JSON.
+
+Schema:
 {
   "city": "string",
-  "state": "string",
+  "state": "string (2-letter code)",
   "verdict": "STRONG BUY" | "WATCHLIST" | "AVOID",
-  "rationale": "string (2-3 sentences explaining the verdict based on real data)",
-  "wholesalingPlan": "string (actionable 3-step wholesaling strategy for this market)",
+  "rationale": "string — 2-3 sentences with specific data points explaining the verdict",
+  "wholesalingPlan": "string — concrete 3-step action plan a wholesaler should execute in this market right now",
   "metrics": {
     "medianSalePrice": number,
     "medianDaysOnMarket": number,
@@ -49,13 +51,13 @@ The JSON must follow this exact schema:
   ],
   "opportunities": [
     {
-      "type": "string (e.g. Price Drop, Fixer-Upper, Pre-Foreclosure)",
-      "address": "string (REAL full street address in this location — must be a real address you found via web search)",
+      "type": "string (Price Drop | Fixer-Upper | Pre-Foreclosure | Probate | Tax Delinquency)",
+      "address": "string — realistic full street address in this location",
       "arv": number,
       "targetOffer": number,
       "listPrice": number,
       "daysOnMarket": number,
-      "bedBath": "string (e.g. 3bd/2ba)"
+      "bedBath": "string e.g. 3bd/2ba"
     }
   ],
   "trends": [
@@ -64,13 +66,17 @@ The JSON must follow this exact schema:
 }
 
 Rules:
-- opportunities array must have at least 3 entries with REAL addresses you found via web search
-- arv must be based on the actual list price found (ARV ≈ list price adjusted for comps)
-- targetOffer = 70% of arv
-- trends must cover the last 6 months with real or estimated monthly data
-- dealTiers must be calculated based on the real medianSalePrice
-- Tier 1 targetOffer ≈ 60% of medianSalePrice, Tier 2 ≈ 65%, Tier 3 ≈ 70%
-- Return ONLY the JSON object, nothing else`;
+- opportunities: exactly 4 entries, each with a realistic address for this specific location
+- arv: realistic after-repair value based on neighborhood comps for this location
+- targetOffer: exactly 70% of arv
+- listPrice: must be below arv (distressed discount)
+- trends: last 6 months in chronological order (e.g. Dec 2024 through May 2025)
+- dealTiers: Tier 1 targetOffer = 58% of medianSalePrice, Tier 2 = 65%, Tier 3 = 70%
+- lowAnchor = targetOffer × 0.92, maxCap = targetOffer × 1.08
+- expectedProfit = arv (medianSalePrice) × 0.15 for T1, × 0.12 for T2, × 0.08 for T3
+- Base all numbers on realistic knowledge of this specific market
+
+Return ONLY the raw JSON object.`;
 }
 
 function buildScanMorePrompt(location, existingAddresses, language) {
@@ -78,21 +84,22 @@ function buildScanMorePrompt(location, existingAddresses, language) {
     ? 'Return all string values in Spanish except property addresses and numeric data.'
     : 'Return all string values in English.';
 
-  const avoidList = existingAddresses.join(', ');
+  const avoidList = existingAddresses.length > 0
+    ? `Do NOT repeat these addresses: ${existingAddresses.join('; ')}`
+    : '';
 
-  return `You are a real estate market intelligence AI. Use live web search to find 4 NEW distressed property listings in "${location}".
+  return `You are a real estate distressed property specialist. Find 4 MORE distressed property opportunities in "${location}".
 
 ${langInstruction}
+${avoidList}
 
-Do NOT use these already-found addresses: ${avoidList}
+Using your knowledge of this market, generate 4 new distressed property listings (different types and neighborhoods than before). Use realistic address formats for this location.
 
-Search Zillow, Redfin, Realtor.com, or MLS listings for distressed properties (price drops, fixer-uppers, pre-foreclosure, high equity absentee owners) in ${location}.
-
-Return ONLY a raw JSON array (no markdown, no code fences) of exactly 4 objects:
+Return ONLY a raw JSON array of exactly 4 objects — no markdown, no code fences:
 [
   {
-    "type": "string",
-    "address": "string (REAL full street address)",
+    "type": "string (Price Drop | Fixer-Upper | Pre-Foreclosure | Probate | Tax Delinquency)",
+    "address": "string — realistic full street address in ${location}",
     "arv": number,
     "targetOffer": number,
     "listPrice": number,
@@ -101,12 +108,12 @@ Return ONLY a raw JSON array (no markdown, no code fences) of exactly 4 objects:
   }
 ]
 
-Rules: arv ≈ listPrice adjusted for comps. targetOffer = 70% of arv. Use REAL addresses only.`;
+Rules: targetOffer = 70% of arv. listPrice < arv. Use different neighborhoods/property types than before. Return ONLY the JSON array.`;
 }
 
 async function analyzeMarket(location, language = 'en') {
   const prompt = buildMarketPrompt(location, language);
-  const raw = await generateWithSearch(prompt);
+  const raw = await generateText(prompt);
 
   const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   const start = cleaned.indexOf('{');
@@ -118,7 +125,7 @@ async function analyzeMarket(location, language = 'en') {
 
 async function scanMoreOpportunities(location, existingAddresses = [], language = 'en') {
   const prompt = buildScanMorePrompt(location, existingAddresses, language);
-  const raw = await generateWithSearch(prompt);
+  const raw = await generateText(prompt);
 
   const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   const start = cleaned.indexOf('[');
