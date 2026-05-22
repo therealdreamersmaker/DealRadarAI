@@ -1,51 +1,12 @@
 /**
- * LLM Service — supports two providers:
- *   PROVIDER=gemini  → Google Gemini 2.0 Flash (requires billing-enabled key)
- *   PROVIDER=groq    → Groq Llama-3.3-70b (free tier, no credit card needed)
- * Default: tries Gemini first, auto-falls back to Groq if billing error.
+ * LLM Service — calls Gemini REST API directly via axios (no SDK).
+ * Falls back to Groq if GROQ_API_KEY is also set.
  */
 
-const PROVIDER = process.env.LLM_PROVIDER || 'auto'; // 'gemini' | 'groq' | 'auto'
+const axios = require('axios');
 
-// ── Gemini ───────────────────────────────────────────────────────────────────
-let geminiAI = null;
-function getGemini() {
-  if (!geminiAI) {
-    const { GoogleGenAI } = require('@google/genai');
-    geminiAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || 'placeholder' });
-  }
-  return geminiAI;
-}
-
-async function callGemini(prompt) {
-  const ai = getGemini();
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: prompt,
-  });
-  return response.text;
-}
-
-// ── Groq ─────────────────────────────────────────────────────────────────────
-let groqClient = null;
-function getGroq() {
-  if (!groqClient) {
-    const Groq = require('groq-sdk');
-    groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY || 'placeholder' });
-  }
-  return groqClient;
-}
-
-async function callGroq(prompt) {
-  const groq = getGroq();
-  const completion = await groq.chat.completions.create({
-    model: 'llama-3.3-70b-versatile',
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0.7,
-    max_tokens: 4096,
-  });
-  return completion.choices[0].message.content;
-}
+const GEMINI_MODEL = 'gemini-2.5-flash';
+const GEMINI_URL   = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent`;
 
 // ── Retry wrapper ─────────────────────────────────────────────────────────────
 async function callWithRetry(fn, maxRetries = 4) {
@@ -55,13 +16,16 @@ async function callWithRetry(fn, maxRetries = 4) {
       return await fn();
     } catch (err) {
       lastError = err;
-      const msg = err?.message || '';
-      const status = err?.status || err?.response?.status;
-      // Don't retry billing/auth errors
-      if (msg.includes('prepayment') || msg.includes('API key') || status === 401 || status === 403) {
+      const status = err?.response?.status || err?.status;
+      const msg    = err?.message || '';
+
+      // Never retry auth / billing / invalid-key errors
+      if (status === 400 || status === 401 || status === 403 ||
+          msg.includes('API_KEY_INVALID') || msg.includes('prepayment')) {
         throw err;
       }
-      if (status === 429 || status === 503 || status === 500) {
+
+      if (status === 429 || status === 500 || status === 503) {
         const delay = Math.min(1000 * Math.pow(2, attempt), 16000);
         console.log(`[LLM] Transient error (${status}). Retry ${attempt + 1}/${maxRetries} in ${delay}ms`);
         await new Promise(r => setTimeout(r, delay));
@@ -73,23 +37,50 @@ async function callWithRetry(fn, maxRetries = 4) {
   throw lastError;
 }
 
+// ── Gemini via direct REST ────────────────────────────────────────────────────
+async function callGemini(prompt) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY is not set');
+
+  const response = await axios.post(
+    `${GEMINI_URL}?key=${apiKey}`,
+    { contents: [{ parts: [{ text: prompt }] }] },
+    { headers: { 'Content-Type': 'application/json' }, timeout: 120000 }
+  );
+
+  const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('Empty response from Gemini');
+  return text;
+}
+
+// ── Groq fallback ─────────────────────────────────────────────────────────────
+async function callGroq(prompt) {
+  const Groq = require('groq-sdk');
+  const groq  = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  const res   = await groq.chat.completions.create({
+    model: 'llama-3.3-70b-versatile',
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0.7,
+    max_tokens: 4096,
+  });
+  return res.choices[0].message.content;
+}
+
 // ── Public interface ──────────────────────────────────────────────────────────
 async function generateText(prompt) {
-  // Auto mode: try Gemini, fall back to Groq on billing errors
-  if (PROVIDER === 'gemini') {
-    return callWithRetry(() => callGemini(prompt));
-  }
-  if (PROVIDER === 'groq') {
-    return callWithRetry(() => callGroq(prompt));
-  }
+  const provider = process.env.LLM_PROVIDER || 'auto';
 
-  // AUTO: try Gemini, fall back to Groq
+  if (provider === 'groq') return callWithRetry(() => callGroq(prompt));
+  if (provider === 'gemini') return callWithRetry(() => callGemini(prompt));
+
+  // auto: try Gemini, fall back to Groq
   try {
     return await callWithRetry(() => callGemini(prompt));
   } catch (err) {
     const msg = err?.message || '';
-    if (msg.includes('prepayment') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('placeholder')) {
-      console.log('[LLM] Gemini unavailable, falling back to Groq...');
+    const hasGroq = process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== 'your_groq_api_key_here';
+    if (hasGroq && (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('429'))) {
+      console.log('[LLM] Gemini quota hit — falling back to Groq...');
       return callWithRetry(() => callGroq(prompt));
     }
     throw err;
@@ -97,8 +88,8 @@ async function generateText(prompt) {
 }
 
 async function generateChat(systemContext, history, userMessage, language) {
-  const langInstruction = language === 'es' ? 'Respond entirely in Spanish. ' : 'Respond in English. ';
-  const prompt = `${langInstruction}You are DealRadar Copilot, a senior real estate wholesaling expert. Use this market analysis data as your knowledge base:\n\n${systemContext}\n\nConversation history:\n${history.map(m => `${m.role}: ${m.content}`).join('\n')}\n\nUser: ${userMessage}\n\nAssistant:`;
+  const lang   = language === 'es' ? 'Respond entirely in Spanish. ' : 'Respond in English. ';
+  const prompt = `${lang}You are DealRadar Copilot, a senior real estate wholesaling expert. Use this market analysis data as your knowledge base:\n\n${systemContext}\n\nConversation history:\n${history.map(m => `${m.role}: ${m.content}`).join('\n')}\n\nUser: ${userMessage}\n\nAssistant:`;
   return generateText(prompt);
 }
 
