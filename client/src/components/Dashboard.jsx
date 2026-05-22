@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, AreaChart, Area } from 'recharts'
+import { ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, AreaChart, Area } from 'recharts'
 import OpportunityCard from './OpportunityCard'
+import MacroComparison from './MacroComparison'
 
 const fmt = n => n != null ? `$${Number(n).toLocaleString()}` : '—'
 const pct = n => n != null ? `${Number(n).toFixed(1)}%` : '—'
@@ -53,7 +54,9 @@ export default function Dashboard({ data, loading, onScanMore, scanLoading, t })
   if (loading) return <LoadingSkeleton />
   if (!data) return null
 
-  const { city, state, verdict, rationale, wholesalingPlan, metrics, dealTiers = [], opportunities = [], trends = [] } = data
+  const { city, state, verdict, rationale, wholesalingPlan, metrics, dealTiers = [], opportunities = [], trends = [], macroComparison } = data
+  const listedOpps    = opportunities.filter(o => o.isListed === true)
+  const offMarketOpps = opportunities.filter(o => o.isListed !== true)
 
   const trendData = trends.map(tr => ({
     ...tr,
@@ -204,38 +207,79 @@ export default function Dashboard({ data, loading, onScanMore, scanLoading, t })
         </div>
       )}
 
-      {/* Opportunities */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <SectionTitle>{t('Actionable Opportunities', 'Oportunidades de Acción')} <span style={{ fontSize: 13, color: '#475569', fontWeight: 400, marginLeft: 8 }}>({opportunities.length})</span></SectionTitle>
-          <button
-            onClick={onScanMore}
-            disabled={scanLoading}
-            className="no-print"
-            style={{
-              padding: '10px 20px',
-              background: scanLoading ? '#1e3a5f' : 'linear-gradient(135deg, #0f4c8a, #1d3a8a)',
-              border: '1px solid #2563eb44',
-              borderRadius: 10,
-              color: '#93c5fd',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: scanLoading ? 'not-allowed' : 'pointer',
-              fontFamily: 'Inter, sans-serif',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
-            {scanLoading ? '⏳' : '🔄'} {t('Scan More', 'Escanear Más')}
-          </button>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
-          {opportunities.map((opp, i) => (
-            <OpportunityCard key={`${opp.address}-${i}`} opp={opp} index={i} t={t} />
-          ))}
-        </div>
+      {/* ── Opportunities header + Scan More ─────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+        <SectionTitle>
+          {t('Actionable Opportunities', 'Oportunidades de Acción')}
+          <span style={{ fontSize: 13, color: '#475569', fontWeight: 400, marginLeft: 8 }}>({opportunities.length})</span>
+        </SectionTitle>
+        <button
+          onClick={onScanMore}
+          disabled={scanLoading}
+          className="no-print"
+          style={{
+            padding: '10px 20px',
+            background: scanLoading ? '#1e3a5f' : 'linear-gradient(135deg, #0f4c8a, #1d3a8a)',
+            border: '1px solid #2563eb44', borderRadius: 10,
+            color: '#93c5fd', fontSize: 13, fontWeight: 600,
+            cursor: scanLoading ? 'not-allowed' : 'pointer',
+            fontFamily: 'Inter, sans-serif',
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}
+        >
+          {scanLoading ? '⏳' : '🔄'} {t('Scan More', 'Escanear Más')}
+        </button>
       </div>
+
+      {/* ── Listed (MLS) block ────────────────────────────────────────── */}
+      {listedOpps.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)',
+              borderRadius: 20, padding: '5px 14px', fontSize: 12, fontWeight: 700, color: '#4ade80',
+            }}>
+              ● {t('Listed On-Market', 'Listadas en Mercado')}
+            </div>
+            <span style={{ fontSize: 12, color: '#334155' }}>
+              {listedOpps.length} {t('properties active on MLS — Zillow & Redfin links available', 'propiedades activas en MLS — enlaces a Zillow y Redfin disponibles')}
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
+            {listedOpps.map((opp, i) => (
+              <OpportunityCard key={`listed-${opp.address}-${i}`} opp={opp} index={i} t={t} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Off-Market block ──────────────────────────────────────────── */}
+      {offMarketOpps.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.25)',
+              borderRadius: 20, padding: '5px 14px', fontSize: 12, fontWeight: 700, color: '#fbbf24',
+            }}>
+              ◆ {t('Off-Market Leads', 'Leads Fuera de Mercado')}
+            </div>
+            <span style={{ fontSize: 12, color: '#334155' }}>
+              {offMarketOpps.length} {t('distressed properties — direct owner contact required', 'propiedades en dificultad — requieren contacto directo con propietario')}
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
+            {offMarketOpps.map((opp, i) => (
+              <OpportunityCard key={`offmkt-${opp.address}-${i}`} opp={opp} index={listedOpps.length + i} t={t} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Macro Market Comparison ───────────────────────────────────── */}
+      <MacroComparison macro={macroComparison} localMetrics={metrics} t={t} />
+
     </div>
   )
 }
