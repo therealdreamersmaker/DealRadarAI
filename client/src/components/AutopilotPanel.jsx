@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell } from 'recharts'
+import LeadsTable from './LeadsTable'
 
 const POLL_INTERVAL = 3000
 
@@ -353,6 +354,37 @@ export default function AutopilotPanel({ t, API }) {
             )}
           </AnimatePresence>
         </div>
+      </div>
+
+      {/* ── Leads Viewer ───────────────────────────────────────────────── */}
+      <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 16, padding: '24px', marginTop: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+              {t('Generated Leads', 'Leads Generados')}
+            </div>
+            <div style={{ fontSize: 12, color: '#475569' }}>
+              {s.totalLeadsProcessed > 0
+                ? t(`${s.totalLeadsProcessed} total leads across all runs`, `${s.totalLeadsProcessed} leads totales en todas las ejecuciones`)
+                : t('Run the autopilot to populate this table.', 'Ejecuta el autopiloto para llenar esta tabla.')}
+            </div>
+          </div>
+          {s.lastExportUrl && (
+            <a
+              href={`${API}${s.lastExportUrl}`}
+              download
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                padding: '8px 16px', background: 'rgba(34,197,94,0.1)',
+                border: '1px solid rgba(34,197,94,0.3)', borderRadius: 10,
+                color: '#4ade80', textDecoration: 'none', fontSize: 12, fontWeight: 700,
+              }}
+            >
+              ⬇ {t('Download CSV', 'Descargar CSV')}
+            </a>
+          )}
+        </div>
+        <LeadsTable API={API} t={t} totalLeadsInState={s.totalLeadsProcessed} />
       </div>
 
       <style>{`

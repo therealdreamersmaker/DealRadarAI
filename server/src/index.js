@@ -7,7 +7,7 @@ const fs = require('fs');
 
 const { analyzeMarket, scanMoreOpportunities } = require('./marketAnalysis');
 const { generateChat } = require('./llmService');
-const { runAutopilot, getState, EXPORTS_DIR } = require('./autopilot');
+const { runAutopilot, getState, getLeads, EXPORTS_DIR } = require('./autopilot');
 
 const app = express();
 app.use(cors());
@@ -65,7 +65,35 @@ app.post('/api/chat', async (req, res) => {
 // ── Autopilot ────────────────────────────────────────────────────────────────
 
 app.get('/api/autopilot/state', (req, res) => {
-  res.json(getState());
+  // Return state without the full leads array (fetched separately)
+  const { leads, ...stateWithoutLeads } = getState();
+  res.json(stateWithoutLeads);
+});
+
+app.get('/api/autopilot/leads', (req, res) => {
+  const page     = Math.max(1, parseInt(req.query.page  || '1'));
+  const pageSize = Math.min(100, parseInt(req.query.size || '25'));
+  const search   = (req.query.search || '').toLowerCase();
+  const filter   = (req.query.filter || '').toLowerCase(); // distress type filter
+
+  let leads = getLeads();
+
+  if (search) {
+    leads = leads.filter(l =>
+      l.fullAddress.toLowerCase().includes(search) ||
+      `${l.ownerFirstName} ${l.ownerLastName}`.toLowerCase().includes(search) ||
+      l.distressType.toLowerCase().includes(search)
+    );
+  }
+  if (filter && filter !== 'all') {
+    leads = leads.filter(l => l.distressType.toLowerCase().includes(filter));
+  }
+
+  const total = leads.length;
+  const pages = Math.ceil(total / pageSize);
+  const data  = leads.slice((page - 1) * pageSize, page * pageSize);
+
+  res.json({ data, total, page, pages, pageSize });
 });
 
 app.post('/api/autopilot/run', async (req, res) => {
