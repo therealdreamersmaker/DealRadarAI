@@ -1,6 +1,9 @@
 [build]
 buildCommand = "cd client && npm install && npm run build && cd ../server && npm install"
 
+[build.variables]
+RAILPACK_NODE_VERSION = "20"
+
 [deploy]
 startCommand = "cd server && node src/index.js"
 healthcheckPath = "/api/autopilot/state"
