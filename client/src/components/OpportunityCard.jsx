@@ -25,7 +25,7 @@ function buildRedfinUrl(address) {
   return `https://www.redfin.com/search#location=${encodeURIComponent(address)}&start=0&count=5`
 }
 
-// ── AI Lead Target card (off-market stub, no real address) ────────────────────
+// ── AI Lead Target card (off-market category, no specific address) ────────────
 function AILeadTargetCard({ opp, index, t }) {
   const style = getTypeStyle(opp.type)
   return (
@@ -60,7 +60,7 @@ function AILeadTargetCard({ opp, index, t }) {
         {style.icon} {opp.type}
       </div>
 
-      {/* AI label */}
+      {/* AI label — honest about what this is */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
         background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)',
@@ -69,10 +69,10 @@ function AILeadTargetCard({ opp, index, t }) {
         <span style={{ fontSize: 18 }}>🤖</span>
         <div>
           <div style={{ fontSize: 12, fontWeight: 700, color: '#a78bfa', marginBottom: 2 }}>
-            {t('AI Lead Target', 'Objetivo AI')}
+            {t('AI-Identified Lead Category', 'Categoría de Lead Identificada por IA')}
           </div>
           <div style={{ fontSize: 11, color: 'var(--dr-text-muted)', lineHeight: 1.5 }}>
-            {t('Real address found via skip-tracing', 'Dirección real encontrada vía skip-tracing')}
+            {t('No specific address — use skip-tracing to find properties in this category', 'Sin dirección específica — usa skip-tracing para encontrar propiedades en esta categoría')}
           </div>
         </div>
       </div>
@@ -87,13 +87,30 @@ function AILeadTargetCard({ opp, index, t }) {
         </div>
       )}
 
+      {/* Skip-trace CTA */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 6,
         background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)',
-        borderRadius: 8, padding: '9px 12px',
+        borderRadius: 8, padding: '9px 12px', marginBottom: 10,
         fontSize: 11, color: '#fbbf24', fontWeight: 600,
       }}>
-        🔍 {t('Use BatchSkipTracing.com or PropStream to find owner contact info', 'Use BatchSkipTracing.com o PropStream para encontrar contacto del propietario')}
+        🔍 {t('Use BatchSkipTracing.com or PropStream to find specific owners', 'Usa BatchSkipTracing.com o PropStream para encontrar propietarios específicos')}
+      </div>
+
+      {/* Greyed-out search buttons — not listed, so not searchable */}
+      <div className="no-print" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <div
+          title={t('No address — property is off-market and not listed on Zillow', 'Sin dirección — propiedad fuera de mercado, no está en Zillow')}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, background: 'var(--dr-surface-deep)', border: '1px solid var(--dr-border)', color: 'var(--dr-text-faintest)', fontSize: 12, fontWeight: 700, cursor: 'not-allowed', userSelect: 'none' }}
+        >
+          🔵 {t('Not on Zillow', 'No en Zillow')}
+        </div>
+        <div
+          title={t('No address — property is off-market and not listed on Redfin', 'Sin dirección — propiedad fuera de mercado, no está en Redfin')}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, background: 'var(--dr-surface-deep)', border: '1px solid var(--dr-border)', color: 'var(--dr-text-faintest)', fontSize: 12, fontWeight: 700, cursor: 'not-allowed', userSelect: 'none' }}
+        >
+          🔴 {t('Not on Redfin', 'No en Redfin')}
+        </div>
       </div>
     </motion.div>
   )
