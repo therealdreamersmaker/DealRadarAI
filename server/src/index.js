@@ -19,6 +19,20 @@ if (fs.existsSync(PUBLIC_DIR)) {
   app.use(express.static(PUBLIC_DIR));
 }
 
+// ── Health / diagnostics ─────────────────────────────────────────────────────
+app.get('/api/health', (req, res) => {
+  const key = process.env.GEMINI_API_KEY || '';
+  res.json({
+    status: 'ok',
+    provider: process.env.LLM_PROVIDER || 'auto',
+    geminiKeySet: key.length > 0,
+    geminiKeyLength: key.length,
+    geminiKeyPreview: key.length > 8 ? `${key.slice(0, 8)}...${key.slice(-4)}` : '(not set)',
+    nodeVersion: process.version,
+    env: process.env.NODE_ENV || 'development',
+  });
+});
+
 // ── Market Analysis ─────────────────────────────────────────────────────────
 
 app.post('/api/analyze', async (req, res) => {
