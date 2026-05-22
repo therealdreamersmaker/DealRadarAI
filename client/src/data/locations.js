@@ -156,5 +156,15 @@ export const LOCATIONS = [
 export function getSuggestions(query) {
   if (!query || query.length < 2) return [];
   const q = query.toLowerCase().trim();
-  return LOCATIONS.filter(loc => loc.toLowerCase().includes(q)).slice(0, 8);
+  const raw = query.trim();
+
+  // Match against the curated list
+  const matches = LOCATIONS.filter(loc => loc.toLowerCase().includes(q));
+
+  // Any 5-digit number = ZIP code → surface it directly even if not in our list
+  if (/^\d{5}$/.test(raw) && !matches.some(m => m.includes(raw))) {
+    matches.unshift(raw);
+  }
+
+  return matches.slice(0, 8);
 }
