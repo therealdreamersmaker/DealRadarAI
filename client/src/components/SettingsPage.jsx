@@ -1,6 +1,6 @@
 export default function SettingsPage({ t }) {
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto' }}>
+    <div style={{ width: '100%' }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--dr-text-1)', marginBottom: 8 }}>{t('Settings', 'Configuración')}</h1>
       <p style={{ color: 'var(--dr-text-faint)', fontSize: 14, marginBottom: 32 }}>{t('Manage your DealRadar AI preferences and integrations.', 'Administra tus preferencias e integraciones de DealRadar AI.')}</p>
 

@@ -1,6 +1,6 @@
 export default function ProfilePage({ t }) {
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto' }}>
+    <div style={{ width: '100%' }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--dr-text-1)', marginBottom: 8 }}>{t('Profile', 'Perfil')}</h1>
       <p style={{ color: 'var(--dr-text-faint)', fontSize: 14, marginBottom: 32 }}>{t('Your account information and subscription details.', 'Tu información de cuenta y detalles de suscripción.')}</p>
 

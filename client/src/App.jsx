@@ -82,7 +82,7 @@ export default function App() {
         t={t}
       />
 
-      <main style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+      <main style={{ flex: 1, minWidth: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
         <AnimatePresence mode="wait">
 
           {/* ── Deal Finder ─────────────────────────────────────── */}
@@ -92,7 +92,7 @@ export default function App() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              style={{ flex: 1, padding: '28px 32px 48px' }}
+              style={{ width: '100%', minWidth: 0, padding: '28px 32px 48px', boxSizing: 'border-box' }}
             >
               <PageTitle
                 icon="🔍"
@@ -126,7 +126,7 @@ export default function App() {
 
                   <AnimatePresence mode="wait">
                     {finderTab === 'results' && (
-                      <motion.div key="results" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                      <motion.div key="results" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ width: '100%' }}>
                         <Dashboard
                           data={dashboardData}
                           loading={loading}
@@ -138,7 +138,7 @@ export default function App() {
                       </motion.div>
                     )}
                     {finderTab === 'copilot' && (
-                      <motion.div key="copilot" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                      <motion.div key="copilot" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ width: '100%' }}>
                         <Copilot dashboardData={dashboardData} language={language} t={t} API={API} />
                       </motion.div>
                     )}
@@ -155,7 +155,7 @@ export default function App() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              style={{ flex: 1, padding: '28px 32px 48px' }}
+              style={{ width: '100%', minWidth: 0, padding: '28px 32px 48px', boxSizing: 'border-box' }}
             >
               <PageTitle
                 icon="📊"
@@ -201,7 +201,7 @@ export default function App() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              style={{ flex: 1, padding: '28px 32px 48px' }}
+              style={{ width: '100%', minWidth: 0, padding: '28px 32px 48px', boxSizing: 'border-box' }}
             >
               <PageTitle
                 icon="⚡"
@@ -219,7 +219,7 @@ export default function App() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              style={{ flex: 1, padding: '28px 32px 48px' }}
+              style={{ width: '100%', minWidth: 0, padding: '28px 32px 48px', boxSizing: 'border-box' }}
             >
               <SettingsPage t={t} />
             </motion.div>
@@ -232,7 +232,7 @@ export default function App() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              style={{ flex: 1, padding: '28px 32px 48px' }}
+              style={{ width: '100%', minWidth: 0, padding: '28px 32px 48px', boxSizing: 'border-box' }}
             >
               <ProfilePage t={t} />
             </motion.div>
