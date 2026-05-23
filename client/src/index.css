@@ -69,7 +69,8 @@ html, body, #root {
   transition: background 0.25s, color 0.25s;
 }
 
-#root { width: 100%; min-height: 100%; display: flex; flex-direction: column; }
+/* Sidebar app shell */
+#root { width: 100%; height: 100%; display: flex; overflow: hidden; }
 
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: var(--dr-scrollbar-track); }

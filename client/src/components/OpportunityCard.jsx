@@ -91,7 +91,8 @@ function buildZillowUrl(address) {
   return `https://www.zillow.com/homes/${encodeURIComponent(slug)}_rb/`
 }
 function buildRedfinUrl(address) {
-  return `https://www.redfin.com/search#location=${encodeURIComponent(address)}&start=0&count=5`
+  // Use Redfin's direct address search — more reliable than the hash-based URL
+  return `https://www.redfin.com/search?location=${encodeURIComponent(address)}`
 }
 
 // ── AI Lead Target card (off-market category, no specific address) ────────────
@@ -214,7 +215,8 @@ function AILeadTargetCard({ opp, index, t }) {
 
 // ── Real listing card (RentCast / MLS) ────────────────────────────────────────
 export default function OpportunityCard({ opp, index, t }) {
-  if (opp.dataSource === 'ai-target' || opp.address == null) {
+  // ai-target = no address (old category cards); ai-estimate = has an address (show full card)
+  if ((opp.dataSource === 'ai-target' || opp.address == null) && opp.dataSource !== 'ai-estimate') {
     return <AILeadTargetCard opp={opp} index={index} t={t} />
   }
 
@@ -249,6 +251,9 @@ export default function OpportunityCard({ opp, index, t }) {
         {isLive && (
           <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', color: '#6ee7b7', letterSpacing: '0.05em' }}>✓ LIVE DATA</span>
         )}
+        {opp.dataSource === 'ai-estimate' && (
+          <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.25)', color: '#c4b5fd', letterSpacing: '0.05em' }}>🤖 AI ESTIMATE</span>
+        )}
       </div>
 
       {/* Type */}
@@ -267,7 +272,6 @@ export default function OpportunityCard({ opp, index, t }) {
         {opp.sqft    && <span>📐 {Number(opp.sqft).toLocaleString()} sqft</span>}
         {opp.yearBuilt && <span>🏗 {opp.yearBuilt}</span>}
         {opp.daysOnMarket > 0 && <span>📅 {opp.daysOnMarket} {t('days', 'días')}</span>}
-        {opp.mlsNumber && <span style={{ color: 'var(--dr-text-faintest)' }}>{opp.mlsNumber}</span>}
       </div>
 
       {/* Financial grid */}

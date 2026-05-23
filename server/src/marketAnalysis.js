@@ -76,41 +76,51 @@ Rules:
 
 function buildScanMorePrompt(location, existingAddresses, language) {
   const langInstruction = language === 'es'
-    ? 'Return all string values in Spanish except property addresses, URLs, and numeric data.'
+    ? 'Return the "note" field in Spanish. Keep addresses, types, and numeric fields in English/numbers.'
     : 'Return all string values in English.';
 
   const avoidList = existingAddresses.length > 0
     ? `Do NOT repeat these addresses: ${existingAddresses.join('; ')}`
     : '';
 
-  return `You are a real estate distressed property specialist. Find 4 MORE off-market distressed property lead types in "${location}".
+  return `You are a real estate data specialist with deep knowledge of US neighborhoods and distressed property markets.
+
+Generate 6 realistic off-market distressed property profiles for "${location}" for MVP demonstration purposes.
 
 ${langInstruction}
 ${avoidList}
 
-IMPORTANT: These are off-market leads — do NOT invent specific street addresses. Return lead type records only.
+Generate plausible property profiles based on your knowledge of typical properties, street names, and neighborhoods in ${location}. Use realistic local street names, zip codes, and price ranges for that specific market.
 
-Return ONLY a raw JSON array of exactly 4 objects — no markdown, no code fences:
+Return ONLY a raw JSON array of exactly 6 objects — no markdown, no code fences, no commentary:
 [
   {
-    "type": "string (Pre-Foreclosure | Probate | Tax Delinquency | Absentee Owner)",
-    "address": null,
-    "arv": null,
-    "targetOffer": null,
-    "listPrice": null,
+    "type": "Foreclosure | Tax Delinquency | Inherited House | Relocations | Property Issues | Fire Damage | Bank Owned | Too Many Liens | No/Low Equity",
+    "address": "string — realistic street address in ${location} (e.g. '2847 Oak Ridge Dr, Atlanta, GA 30318')",
+    "arv": number,
+    "targetOffer": number,
+    "listPrice": number,
     "daysOnMarket": null,
-    "bedBath": null,
-    "sqft": null,
+    "bedBath": "string e.g. '3bd/2ba'",
+    "sqft": number,
+    "yearBuilt": number,
     "isListed": false,
     "mlsNumber": null,
-    "dataSource": "ai-target",
+    "dataSource": "ai-estimate",
     "zillowUrl": null,
     "redfinUrl": null,
-    "note": "string — brief guidance on how to find and approach this distress category in ${location}"
+    "note": "1-2 sentences: owner situation + why it's a strong wholesale deal"
   }
 ]
 
-Rules: Vary the types. Return ONLY the JSON array.`;
+Rules:
+- Use all 9 types, vary them (Foreclosure, Tax Delinquency, Inherited House, Relocations, Property Issues, Fire Damage, Bank Owned, Too Many Liens, No/Low Equity)
+- ARV: realistic for ${location} housing market ($80k–$500k range depending on market)
+- listPrice: 65–78% of ARV (motivated seller discount)
+- targetOffer: 65–70% of ARV
+- sqft: 900–2400, yearBuilt: 1945–2005
+- Addresses must look real for ${location} — use actual neighborhood names and street patterns
+- Return ONLY the JSON array.`;
 }
 
 async function analyzeMarket(location, language = 'en') {
@@ -155,12 +165,12 @@ async function scanMoreOpportunities(location, existingAddresses = [], language 
   const end     = cleaned.lastIndexOf(']');
   if (start === -1 || end === -1) throw new Error('No JSON array found in LLM response');
   const results = JSON.parse(cleaned.slice(start, end + 1));
-  // Ensure all fields are correctly set (AI may hallucinate addresses despite instructions)
+  // Normalise: ensure isListed=false and dataSource='ai-estimate' on all returned records
   return results.map(r => ({
     ...r,
-    address:    null,
     isListed:   false,
-    dataSource: 'ai-target',
+    dataSource: 'ai-estimate',
+    mlsNumber:  null,
     zillowUrl:  null,
     redfinUrl:  null,
   }));
