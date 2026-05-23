@@ -262,7 +262,7 @@ export default function OpportunityCard({ opp, index, t }) {
       </div>
 
       {/* Sub-details */}
-      <div style={{ fontSize: 11, color: 'var(--dr-text-faint)', marginBottom: 14, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+      <div style={{ fontSize: 11, color: '#c8d3e6', marginBottom: 14, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         {opp.bedBath && <span>🛏 {opp.bedBath}</span>}
         {opp.sqft    && <span>📐 {Number(opp.sqft).toLocaleString()} sqft</span>}
         {opp.yearBuilt && <span>🏗 {opp.yearBuilt}</span>}
@@ -273,10 +273,10 @@ export default function OpportunityCard({ opp, index, t }) {
       {/* Financial grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
         {[
-          [t('List Price', 'Precio Lista'),        fmt(opp.listPrice),   'var(--dr-text-muted)'],
+          [t('List Price', 'Precio Lista'),        fmt(opp.listPrice),   '#f97316'],
           [t('ARV', 'Valor ARV'),                  fmt(opp.arv),         '#60a5fa'],
-          [t('Target Offer (70%)', 'Oferta (70%)'), fmt(opp.targetOffer), '#4ade80'],
-          [t('Est. Profit', 'Ganancia Est.'),       profit ? fmt(profit) : '—', '#fbbf24'],
+          [t('Target Offer (70%)', 'Oferta (70%)'), fmt(opp.targetOffer), '#f97316'],
+          [t('Est. Profit', 'Ganancia Est.'),       profit ? fmt(profit) : '—', '#22c55e'],
         ].map(([label, val, color]) => (
           <div key={label} style={{ background: 'var(--dr-surface-deep)', borderRadius: 8, padding: '9px 11px' }}>
             <div style={{ fontSize: 10, color: 'var(--dr-text-faint)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 3 }}>{label}</div>
@@ -293,7 +293,7 @@ export default function OpportunityCard({ opp, index, t }) {
 
       {/* Deal insight panel */}
       {(() => {
-        const { bullets, actions } = generateInsight(opp)
+        const { bullets } = generateInsight(opp)
         return (
           <div style={{
             background: 'rgba(34,197,94,0.06)',
@@ -312,18 +312,6 @@ export default function OpportunityCard({ opp, index, t }) {
                 <div key={i} style={{ fontSize: 11, color: '#86efac', lineHeight: 1.55 }}>{b}</div>
               ))}
             </div>
-            {actions.length > 0 && (
-              <div style={{ marginTop: 9, paddingTop: 8, borderTop: '1px solid rgba(34,197,94,0.14)' }}>
-                <div style={{ fontSize: 10, fontWeight: 800, color: '#4ade80', letterSpacing: '0.08em', marginBottom: 5 }}>
-                  ▶ {t('NEXT STEP', 'PRÓXIMO PASO')}
-                </div>
-                {actions.map((a, i) => (
-                  <div key={i} style={{ fontSize: 11, color: '#4ade80', fontWeight: 600, lineHeight: 1.5 }}>
-                    → {a}
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         )
       })()}

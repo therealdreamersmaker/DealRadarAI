@@ -2,33 +2,33 @@
 
 /* ── Theme tokens ───────────────────────────────────────────────────────────── */
 :root {
-  /* Dark theme (default) */
-  --dr-page:             #070b14;
-  --dr-surface:          #0f172a;
-  --dr-surface-alt:      #0a1628;
-  --dr-surface-deep:     #070b14;
-  --dr-surface-mid:      #0d1f3c;
-  --dr-surface-header:   #0a0f1e;
-  --dr-surface-darker:   #0a1020;
-  --dr-border:           #1e293b;
+  /* Dark theme — carbon/slate black (not blue-tinted) */
+  --dr-page:             #0c0c0f;
+  --dr-surface:          #141418;
+  --dr-surface-alt:      #111115;
+  --dr-surface-deep:     #0c0c0f;
+  --dr-surface-mid:      #1a1a1f;
+  --dr-surface-header:   #111115;
+  --dr-surface-darker:   #0a0a0d;
+  --dr-border:           #26262e;
   --dr-border-blue:      #1e3a5f;
   --dr-text-1:           #f1f5f9;
   --dr-text-2:           #e2e8f0;
   --dr-text-3:           #cbd5e1;
-  --dr-text-muted:       #64748b;
-  --dr-text-faint:       #475569;
-  --dr-text-faintest:    #334155;
-  --dr-input-bg:         #070b14;
-  --dr-dropdown-bg:      #0f172a;
-  --dr-scrollbar-track:  #0d1526;
-  --dr-scrollbar-thumb:  #1e3a5f;
+  --dr-text-muted:       #8b95a8;
+  --dr-text-faint:       #5c6880;
+  --dr-text-faintest:    #3a4254;
+  --dr-input-bg:         #0c0c0f;
+  --dr-dropdown-bg:      #141418;
+  --dr-scrollbar-track:  #111115;
+  --dr-scrollbar-thumb:  #26262e;
   /* Gradient shorthands */
-  --dr-grad-card:        linear-gradient(135deg, #0f172a, #0d1f3c);
-  --dr-grad-card-alt:    linear-gradient(135deg, #0f172a, #0a1628);
-  --dr-grad-header-card: linear-gradient(135deg, #0a0f1e, #0d1f3c);
-  --dr-grad-autopilot:   linear-gradient(135deg, #0a0f1e, #0d1a2e);
-  --dr-grad-hero:        linear-gradient(135deg, #0a0f1e, #0d1f3c);
-  --dr-grad-nav:         linear-gradient(180deg, #0a0f1e 0%, #070b14 100%);
+  --dr-grad-card:        linear-gradient(135deg, #141418, #1a1a1f);
+  --dr-grad-card-alt:    linear-gradient(135deg, #141418, #111115);
+  --dr-grad-header-card: linear-gradient(135deg, #111115, #1a1a1f);
+  --dr-grad-autopilot:   linear-gradient(135deg, #111115, #17171c);
+  --dr-grad-hero:        linear-gradient(135deg, #111115, #1a1a1f);
+  --dr-grad-nav:         linear-gradient(180deg, #111115 0%, #0c0c0f 100%);
 }
 
 [data-theme="light"] {

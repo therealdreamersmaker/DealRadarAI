@@ -6,11 +6,57 @@ import { useTheme } from '../ThemeContext'
 
 const POLL_INTERVAL = 3000
 
+const ALL_NICHES = ['Pre-Foreclosure', 'Tax Delinquency', 'Probate', 'Absentee Owner', 'Fixer-Upper', 'Price Drop', 'Extended DOM']
+
+const DEFAULT_SETTINGS = {
+  runTime:  '06:00',
+  markets:  ['Atlanta, GA', 'Houston, TX', 'Dallas, TX'],
+  niches:   ['Pre-Foreclosure', 'Tax Delinquency', 'Probate', 'Absentee Owner'],
+}
+
+function loadSettings() {
+  try {
+    const s = localStorage.getItem('dr-autopilot-settings')
+    return s ? { ...DEFAULT_SETTINGS, ...JSON.parse(s) } : DEFAULT_SETTINGS
+  } catch { return DEFAULT_SETTINGS }
+}
+
 export default function AutopilotPanel({ t, API }) {
   const { chart } = useTheme()
-  const [state,      setState]      = useState(null)
-  const [triggering, setTriggering] = useState(false)
-  const [error,      setError]      = useState(null)
+  const [state,        setState]        = useState(null)
+  const [triggering,   setTriggering]   = useState(false)
+  const [error,        setError]        = useState(null)
+  const [showSettings, setShowSettings] = useState(false)
+  const [settings,     setSettings]     = useState(loadSettings)
+  const [marketInput,  setMarketInput]  = useState('')
+
+  function saveSettings(next) {
+    setSettings(next)
+    try { localStorage.setItem('dr-autopilot-settings', JSON.stringify(next)) } catch {}
+  }
+
+  function handleTimeChange(e) {
+    saveSettings({ ...settings, runTime: e.target.value })
+  }
+
+  function addMarket() {
+    const v = marketInput.trim()
+    if (v && !settings.markets.includes(v)) {
+      saveSettings({ ...settings, markets: [...settings.markets, v] })
+    }
+    setMarketInput('')
+  }
+
+  function removeMarket(m) {
+    saveSettings({ ...settings, markets: settings.markets.filter(x => x !== m) })
+  }
+
+  function toggleNiche(n) {
+    const next = settings.niches.includes(n)
+      ? settings.niches.filter(x => x !== n)
+      : [...settings.niches, n]
+    saveSettings({ ...settings, niches: next })
+  }
 
   const fetchState = useCallback(async () => {
     try {
@@ -72,13 +118,13 @@ export default function AutopilotPanel({ t, API }) {
                 {t('Autopilot Deal Hunter', 'Cazador de Tratos Autopiloto')}
               </div>
               <div style={{ fontSize: 12, color: 'var(--dr-text-faint)' }}>
-                {t('Daily cron job @ 6:00 AM • GoHighLevel CRM integration', 'Tarea diaria a las 6:00 AM • Integración GoHighLevel CRM')}
+                {t(`Daily cron job @ ${settings.runTime} • ${settings.niches.length} niches • ${settings.markets.length} markets`, `Tarea diaria a las ${settings.runTime} • ${settings.niches.length} nichos • ${settings.markets.length} mercados`)}
               </div>
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           {isRunning && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 20, padding: '8px 16px', fontSize: 12, color: '#60a5fa', fontWeight: 600 }}>
               <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', animation: 'pulse 1s infinite' }} />
@@ -90,6 +136,19 @@ export default function AutopilotPanel({ t, API }) {
               {t('Next:', 'Próximo:')} {new Date(state.nextRun).toLocaleString()}
             </div>
           )}
+          <button
+            onClick={() => setShowSettings(s => !s)}
+            style={{
+              padding: '10px 18px',
+              background: showSettings ? 'rgba(124,58,237,0.2)' : 'rgba(124,58,237,0.08)',
+              border: '1px solid rgba(124,58,237,0.35)', borderRadius: 12,
+              color: '#a78bfa', fontWeight: 700, fontSize: 13,
+              cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            ⚙ {t('Settings', 'Configuración')}
+          </button>
           <motion.button
             onClick={triggerRun}
             disabled={isRunning || triggering}
@@ -110,6 +169,126 @@ export default function AutopilotPanel({ t, API }) {
           </motion.button>
         </div>
       </div>
+
+      {/* ── Settings Panel ───────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showSettings && (
+          <motion.div
+            key="settings"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            style={{ overflow: 'hidden', marginBottom: 20 }}
+          >
+            <div style={{
+              background: 'var(--dr-surface)', border: '1px solid rgba(124,58,237,0.3)',
+              borderRadius: 16, padding: '24px',
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#a78bfa', letterSpacing: '0.08em', marginBottom: 20 }}>
+                ⚙ {t('AUTOPILOT SETTINGS', 'CONFIGURACIÓN DEL AUTOPILOTO')}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '20px 32px', alignItems: 'start' }}>
+
+                {/* Run time */}
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--dr-text-muted)', paddingTop: 8 }}>
+                  🕐 {t('Run Time', 'Hora de Ejecución')}
+                </div>
+                <div>
+                  <input
+                    type="time"
+                    value={settings.runTime}
+                    onChange={handleTimeChange}
+                    style={{
+                      background: 'var(--dr-surface-deep)', border: '1px solid var(--dr-border)',
+                      borderRadius: 8, padding: '8px 12px', color: 'var(--dr-text-1)',
+                      fontSize: 13, fontFamily: 'JetBrains Mono, monospace',
+                    }}
+                  />
+                  <div style={{ fontSize: 11, color: 'var(--dr-text-faintest)', marginTop: 4 }}>
+                    {t('Time the daily cron job fires (server local time)', 'Hora en que se ejecuta el trabajo diario (hora del servidor)')}
+                  </div>
+                </div>
+
+                {/* Target markets */}
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--dr-text-muted)', paddingTop: 8 }}>
+                  🗺 {t('Target Markets', 'Mercados Objetivo')}
+                </div>
+                <div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                    {settings.markets.map(m => (
+                      <span key={m} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 5,
+                        background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)',
+                        borderRadius: 20, padding: '4px 10px', fontSize: 11, color: '#60a5fa', fontWeight: 600,
+                      }}>
+                        {m}
+                        <button onClick={() => removeMarket(m)} style={{ background: 'none', border: 'none', color: '#60a5fa', cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: '0 0 0 2px', fontFamily: 'inherit' }}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      value={marketInput}
+                      onChange={e => setMarketInput(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && addMarket()}
+                      placeholder={t('e.g. Tampa, FL or 77001', 'ej. Tampa, FL o 77001')}
+                      style={{
+                        flex: 1, background: 'var(--dr-surface-deep)', border: '1px solid var(--dr-border)',
+                        borderRadius: 8, padding: '8px 12px', color: 'var(--dr-text-1)',
+                        fontSize: 12, fontFamily: 'Inter, sans-serif',
+                      }}
+                    />
+                    <button
+                      onClick={addMarket}
+                      style={{
+                        padding: '8px 14px', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)',
+                        borderRadius: 8, color: '#60a5fa', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
+                      }}
+                    >
+                      + {t('Add', 'Agregar')}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Niches */}
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--dr-text-muted)', paddingTop: 8 }}>
+                  🎯 {t('Niches', 'Nichos')}
+                </div>
+                <div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {ALL_NICHES.map(n => {
+                      const on = settings.niches.includes(n)
+                      return (
+                        <button
+                          key={n}
+                          onClick={() => toggleNiche(n)}
+                          style={{
+                            padding: '6px 14px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+                            cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+                            background: on ? 'rgba(124,58,237,0.2)' : 'var(--dr-surface-deep)',
+                            border: on ? '1px solid rgba(124,58,237,0.5)' : '1px solid var(--dr-border)',
+                            color: on ? '#c4b5fd' : 'var(--dr-text-faint)',
+                          }}
+                        >
+                          {on ? '✓ ' : ''}{n}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--dr-text-faintest)', marginTop: 8 }}>
+                    {t('Select the distress categories the autopilot should focus on', 'Selecciona las categorías de angustia en las que el autopiloto debe enfocarse')}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 20, padding: '12px 14px', background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.15)', borderRadius: 8, fontSize: 11, color: '#a78bfa' }}>
+                ✅ {t('Settings are saved automatically to your browser — no sign-in required', 'La configuración se guarda automáticamente en tu navegador — no se necesita inicio de sesión')}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {error && (
         <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 12, padding: '12px 16px', color: '#fca5a5', marginBottom: 16, fontSize: 13 }}>
@@ -373,9 +552,9 @@ function Spinner() {
 }
 
 const WORKFLOW_STEPS = [
-  { icon: '🌐', title: 'Market Selection', titleEs: 'Selección de Mercado', desc: 'Top 3 zip codes by DOM, price drops & ratio', descEs: 'Los 3 mejores códigos postales' },
-  { icon: '🏠', title: 'List Extraction', titleEs: 'Extracción de Lista', desc: '100 distressed properties per day', descEs: '100 propiedades por día' },
-  { icon: '📞', title: 'Skip Tracing', titleEs: 'Rastreo de Contactos', desc: 'Owner contact enrichment & validation', descEs: 'Enriquecimiento de contactos' },
-  { icon: '📊', title: 'CSV Export', titleEs: 'Exportar CSV', desc: 'Structured spreadsheet with all fields', descEs: 'Hoja de cálculo estructurada' },
-  { icon: '🚀', title: 'CRM Injection', titleEs: 'Inyección CRM', desc: 'GoHighLevel with Autopilot_Lead_Ready tag', descEs: 'GoHighLevel con etiqueta Autopilot' },
+  { icon: '🌐', title: 'Market Selection',  titleEs: 'Selección de Mercado',    desc: 'Target markets scanned by DOM, price drops & sale ratio', descEs: 'Mercados objetivo escaneados por DOM, rebajas y ratio' },
+  { icon: '🏠', title: 'Lead Extraction',   titleEs: 'Extracción de Leads',     desc: 'Distressed properties pulled per selected niche',          descEs: 'Propiedades en dificultad extraídas por nicho seleccionado' },
+  { icon: '🤖', title: 'AI Scoring',        titleEs: 'Puntuación IA',           desc: 'Each lead scored for motivation, equity & profit',         descEs: 'Cada lead puntuado por motivación, equidad y ganancia' },
+  { icon: '📊', title: 'CSV Export',        titleEs: 'Exportar CSV',            desc: 'Structured spreadsheet with all enriched fields',          descEs: 'Hoja de cálculo estructurada con todos los campos' },
+  { icon: '📬', title: 'Ready for Outreach',titleEs: 'Listo para Contacto',     desc: 'Leads ready for direct mail, SMS or cold calling',        descEs: 'Leads listos para correo directo, SMS o llamadas' },
 ]

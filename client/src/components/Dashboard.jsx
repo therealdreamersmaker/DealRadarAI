@@ -7,6 +7,98 @@ import { useTheme } from '../ThemeContext'
 const fmt = n => n != null ? `$${Number(n).toLocaleString()}` : '—'
 const pct = n => n != null ? `${Number(n).toFixed(1)}%` : '—'
 
+// Category definitions — controls section order, labels, colours
+const DEAL_CATEGORIES = [
+  {
+    key:     'listed',
+    label:   'Top MLS Opportunities',
+    labelEs: 'Mejores Oportunidades MLS',
+    badge:   '● MLS LISTED',
+    icon:    '🏆',
+    color:   '#4ade80',
+    bg:      'rgba(34,197,94,0.08)',
+    border:  'rgba(34,197,94,0.25)',
+    desc:    (n, t) => t(`${n} real MLS properties — live Zillow & Redfin links`, `${n} propiedades MLS reales — enlaces en vivo a Zillow y Redfin`),
+  },
+  {
+    key:     'Pre-Foreclosure',
+    label:   'Pre-Foreclosure Leads',
+    labelEs: 'Leads de Pre-Ejecución',
+    badge:   '⚠️ PRE-FORECLOSURE',
+    icon:    '⚠️',
+    color:   '#c084fc',
+    bg:      'rgba(192,132,252,0.08)',
+    border:  'rgba(192,132,252,0.25)',
+    desc:    (n, t) => t('Homeowners 30–120 days behind on payments — skip-trace to reach them before auction', 'Propietarios con 30–120 días de atraso — skip-trace antes de la subasta'),
+  },
+  {
+    key:     'Probate',
+    label:   'Probate Estate Leads',
+    labelEs: 'Leads de Sucesión',
+    badge:   '📋 PROBATE',
+    icon:    '📋',
+    color:   '#94a3b8',
+    bg:      'rgba(148,163,184,0.08)',
+    border:  'rgba(148,163,184,0.25)',
+    desc:    (n, t) => t('Heirs needing to liquidate inherited properties — search probate court records', 'Herederos que necesitan liquidar propiedades heredadas — busca en registros del tribunal'),
+  },
+  {
+    key:     'Tax Delinquency',
+    label:   'Tax Delinquency Leads',
+    labelEs: 'Leads de Deuda Fiscal',
+    badge:   '💸 TAX DELINQUENT',
+    icon:    '💸',
+    color:   '#fb923c',
+    bg:      'rgba(249,115,22,0.08)',
+    border:  'rgba(249,115,22,0.25)',
+    desc:    (n, t) => t('Owners 2+ years behind on property taxes — highest motivation to sell at a discount', 'Propietarios con 2+ años de atraso en impuestos — mayor motivación para vender'),
+  },
+  {
+    key:     'Absentee Owner',
+    label:   'Absentee Owner Leads',
+    labelEs: 'Leads de Propietario Ausente',
+    badge:   '🔑 ABSENTEE OWNER',
+    icon:    '🔑',
+    color:   '#facc15',
+    bg:      'rgba(250,204,21,0.08)',
+    border:  'rgba(250,204,21,0.25)',
+    desc:    (n, t) => t('Out-of-state landlords — often tired of managing remote properties and open to below-market deals', 'Propietarios fuera del estado — dispuestos a vender por debajo del mercado'),
+  },
+  {
+    key:     'Price Drop',
+    label:   'Price Drop Properties',
+    labelEs: 'Propiedades con Rebaja de Precio',
+    badge:   '📉 PRICE DROP',
+    icon:    '📉',
+    color:   '#f87171',
+    bg:      'rgba(239,68,68,0.08)',
+    border:  'rgba(239,68,68,0.25)',
+    desc:    (n, t) => t('MLS listings with confirmed price reductions — seller motivation is proven', 'Listados MLS con rebajas de precio confirmadas — motivación del vendedor probada'),
+  },
+  {
+    key:     'Fixer-Upper',
+    label:   'Fixer-Upper Properties',
+    labelEs: 'Propiedades para Renovar',
+    badge:   '🔨 FIXER-UPPER',
+    icon:    '🔨',
+    color:   '#fb923c',
+    bg:      'rgba(249,115,22,0.08)',
+    border:  'rgba(249,115,22,0.25)',
+    desc:    (n, t) => t('Older properties needing rehab — maximum value-add upside after renovation', 'Propiedades más antiguas que necesitan renovación — máximo potencial de valor'),
+  },
+  {
+    key:     'Extended DOM',
+    label:   'Extended Days on Market',
+    labelEs: 'Días en Mercado Extendidos',
+    badge:   '⏳ EXTENDED DOM',
+    icon:    '⏳',
+    color:   '#60a5fa',
+    bg:      'rgba(96,165,250,0.08)',
+    border:  'rgba(96,165,250,0.25)',
+    desc:    (n, t) => t('Listings sitting 45+ days — seller fatigue opens the door to creative negotiations', 'Listados con 45+ días — el cansancio del vendedor abre la puerta a negociaciones'),
+  },
+]
+
 function StatCard({ label, value, sub, color = '#3b82f6', icon }) {
   return (
     <motion.div
@@ -55,8 +147,28 @@ export default function Dashboard({ data, loading, onScanMore, scanLoading, t })
   if (!data) return null
 
   const { city, state, verdict, rationale, wholesalingPlan, metrics, dealTiers = [], opportunities = [], trends = [], macroComparison } = data
-  const listedOpps    = opportunities.filter(o => o.isListed === true)
-  const offMarketOpps = opportunities.filter(o => o.isListed !== true)
+
+  // Group opportunities by category key
+  const grouped = {}
+  opportunities.forEach(opp => {
+    let key
+    if (opp.isListed === true) {
+      // Listed: separate Price Drops and Fixer-Uppers into their own sections; rest go to 'listed'
+      if (opp.type === 'Price Drop' || opp.type === 'Fixer-Upper' || opp.type === 'Extended DOM') {
+        key = opp.type
+      } else {
+        key = 'listed'
+      }
+    } else {
+      // Off-market: group by distress type
+      key = opp.type || 'listed'
+    }
+    if (!grouped[key]) grouped[key] = []
+    grouped[key].push(opp)
+  })
+
+  // Always show 'listed' section first even if empty (skip if truly 0)
+  const sectionsToRender = DEAL_CATEGORIES.filter(cat => (grouped[cat.key] || []).length > 0)
 
   const trendData = trends.map(tr => ({
     ...tr,
@@ -194,7 +306,7 @@ export default function Dashboard({ data, loading, onScanMore, scanLoading, t })
       )}
 
       {/* ── Opportunities header + Scan More ─────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <SectionTitle>
           {t('Actionable Opportunities', 'Oportunidades de Acción')}
           <span style={{ fontSize: 13, color: 'var(--dr-text-faint)', fontWeight: 400, marginLeft: 8 }}>({opportunities.length})</span>
@@ -217,49 +329,53 @@ export default function Dashboard({ data, loading, onScanMore, scanLoading, t })
         </button>
       </div>
 
-      {/* ── Listed (MLS) block ────────────────────────────────────────── */}
-      {listedOpps.length > 0 && (
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)',
-              borderRadius: 20, padding: '5px 14px', fontSize: 12, fontWeight: 700, color: '#4ade80',
-            }}>
-              ● {t('Listed On-Market', 'Listadas en Mercado')}
+      {/* ── Categorized opportunity sections ─────────────────────────── */}
+      {sectionsToRender.map((cat, catIdx) => {
+        const opps = grouped[cat.key] || []
+        return (
+          <motion.div
+            key={cat.key}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: catIdx * 0.06 }}
+            style={{ marginBottom: 32 }}
+          >
+            {/* Section header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, paddingBottom: 12, borderBottom: `1px solid ${cat.border}` }}>
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                background: cat.bg, border: `1px solid ${cat.border}`,
+                borderRadius: 20, padding: '6px 16px',
+                fontSize: 12, fontWeight: 800, color: cat.color,
+                letterSpacing: '0.04em',
+              }}>
+                {cat.icon} {t(cat.label, cat.labelEs)}
+              </div>
+              <span style={{ fontSize: 12, color: 'var(--dr-text-faint)', flex: 1 }}>
+                {cat.desc(opps.length, t)}
+              </span>
+              <span style={{
+                fontSize: 11, fontWeight: 700, color: cat.color,
+                background: cat.bg, border: `1px solid ${cat.border}`,
+                borderRadius: 12, padding: '3px 10px',
+              }}>
+                {opps.length} {opps.length === 1 ? t('result', 'resultado') : t('results', 'resultados')}
+              </span>
             </div>
-            <span style={{ fontSize: 12, color: 'var(--dr-text-faintest)' }}>
-              {listedOpps.length} {t('real MLS properties — live Zillow & Redfin links', 'propiedades MLS reales — enlaces en vivo a Zillow y Redfin')}
-            </span>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
-            {listedOpps.map((opp, i) => (
-              <OpportunityCard key={`listed-${opp.address}-${i}`} opp={opp} index={i} t={t} />
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* ── Off-Market block ──────────────────────────────────────────── */}
-      {offMarketOpps.length > 0 && (
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.25)',
-              borderRadius: 20, padding: '5px 14px', fontSize: 12, fontWeight: 700, color: '#fbbf24',
-            }}>
-              ◆ {t('Off-Market Leads', 'Leads Fuera de Mercado')}
+            {/* Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
+              {opps.map((opp, i) => (
+                <OpportunityCard key={`${cat.key}-${opp.address || opp.type}-${i}`} opp={opp} index={i} t={t} />
+              ))}
             </div>
-            <span style={{ fontSize: 12, color: 'var(--dr-text-faintest)' }}>
-              {offMarketOpps.length} {t('distressed lead types — skip-trace to find owners', 'tipos de leads en dificultad — skip-trace para encontrar propietarios')}
-            </span>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
-            {offMarketOpps.map((opp, i) => (
-              <OpportunityCard key={`offmkt-${opp.type}-${i}`} opp={opp} index={listedOpps.length + i} t={t} />
-            ))}
-          </div>
+          </motion.div>
+        )
+      })}
+
+      {opportunities.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--dr-text-faintest)', fontSize: 14 }}>
+          {t('No opportunities found. Try Scan More to search additional lead types.', 'No se encontraron oportunidades. Prueba Escanear Más para buscar tipos adicionales.')}
         </div>
       )}
 
