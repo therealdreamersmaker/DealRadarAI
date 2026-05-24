@@ -7,6 +7,19 @@ import { getSuggestions } from '../data/locations'
 
 const POLL_INTERVAL = 3000
 
+// Colors aligned with Dashboard DEAL_CATEGORIES
+const NICHE_COLORS = {
+  'Foreclosure':     { bg: 'rgba(239,68,68,0.15)',   border: 'rgba(239,68,68,0.45)',   text: '#f87171',  icon: '⚖️' },
+  'Tax Delinquency': { bg: 'rgba(249,115,22,0.15)',  border: 'rgba(249,115,22,0.45)',  text: '#fb923c',  icon: '💸' },
+  'Property Issues': { bg: 'rgba(167,139,250,0.15)', border: 'rgba(167,139,250,0.45)', text: '#a78bfa',  icon: '🏚' },
+  'Inherited House': { bg: 'rgba(148,163,184,0.15)', border: 'rgba(148,163,184,0.45)', text: '#94a3b8',  icon: '📋' },
+  'Relocations':     { bg: 'rgba(52,211,153,0.15)',  border: 'rgba(52,211,153,0.45)',  text: '#34d399',  icon: '🚚' },
+  'Fire Damage':     { bg: 'rgba(249,115,22,0.15)',  border: 'rgba(249,115,22,0.55)',  text: '#f97316',  icon: '🔥' },
+  'Bank Owned':      { bg: 'rgba(96,165,250,0.15)',  border: 'rgba(96,165,250,0.45)',  text: '#60a5fa',  icon: '🏦' },
+  'Too Many Liens':  { bg: 'rgba(192,132,252,0.15)', border: 'rgba(192,132,252,0.45)', text: '#c084fc',  icon: '⛓' },
+  'No/Low Equity':   { bg: 'rgba(250,204,21,0.15)',  border: 'rgba(250,204,21,0.45)',  text: '#facc15',  icon: '📉' },
+}
+
 const ALL_NICHES = [
   'Foreclosure', 'Tax Delinquency', 'Property Issues', 'Inherited House',
   'Relocations', 'Fire Damage', 'Bank Owned', 'Too Many Liens', 'No/Low Equity',
@@ -397,6 +410,7 @@ export default function AutopilotPanel({ t, API }) {
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {ALL_NICHES.map(n => {
                       const on = settings.niches.includes(n)
+                      const c  = NICHE_COLORS[n] || { bg: 'rgba(124,58,237,0.18)', border: 'rgba(124,58,237,0.5)', text: '#c4b5fd', icon: '•' }
                       return (
                         <button
                           key={n}
@@ -404,12 +418,12 @@ export default function AutopilotPanel({ t, API }) {
                           style={{
                             padding: '6px 14px', borderRadius: 20, fontSize: 11, fontWeight: 700,
                             cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
-                            background: on ? 'rgba(124,58,237,0.2)' : 'var(--dr-surface-deep)',
-                            border: on ? '1px solid rgba(124,58,237,0.5)' : '1px solid var(--dr-border)',
-                            color: on ? '#c4b5fd' : 'var(--dr-text-faint)',
+                            background: on ? c.bg : 'var(--dr-surface-deep)',
+                            border: `1px solid ${on ? c.border : 'var(--dr-border)'}`,
+                            color: on ? c.text : 'var(--dr-text-faint)',
                           }}
                         >
-                          {on ? '✓ ' : ''}{n}
+                          {on ? `${c.icon} ` : ''}{n}
                         </button>
                       )
                     })}
