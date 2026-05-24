@@ -1,17 +1,21 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell } from 'recharts'
 import LeadsTable from './LeadsTable'
 import { useTheme } from '../ThemeContext'
+import { getSuggestions } from '../data/locations'
 
 const POLL_INTERVAL = 3000
 
-const ALL_NICHES = ['Pre-Foreclosure', 'Tax Delinquency', 'Probate', 'Absentee Owner', 'Fixer-Upper', 'Price Drop', 'Extended DOM']
+const ALL_NICHES = [
+  'Foreclosure', 'Tax Delinquency', 'Property Issues', 'Inherited House',
+  'Relocations', 'Fire Damage', 'Bank Owned', 'Too Many Liens', 'No/Low Equity',
+]
 
 const DEFAULT_SETTINGS = {
   runTime:  '06:00',
   markets:  ['Atlanta, GA', 'Houston, TX', 'Dallas, TX'],
-  niches:   ['Pre-Foreclosure', 'Tax Delinquency', 'Probate', 'Absentee Owner'],
+  niches:   ['Foreclosure', 'Tax Delinquency', 'Inherited House', 'Bank Owned'],
 }
 
 function loadSettings() {
@@ -23,12 +27,17 @@ function loadSettings() {
 
 export default function AutopilotPanel({ t, API }) {
   const { chart } = useTheme()
-  const [state,        setState]        = useState(null)
-  const [triggering,   setTriggering]   = useState(false)
-  const [error,        setError]        = useState(null)
-  const [showSettings, setShowSettings] = useState(false)
-  const [settings,     setSettings]     = useState(loadSettings)
-  const [marketInput,  setMarketInput]  = useState('')
+  const [state,            setState]           = useState(null)
+  const [triggering,       setTriggering]      = useState(false)
+  const [error,            setError]           = useState(null)
+  const [showSettings,     setShowSettings]    = useState(false)
+  const [settings,         setSettings]        = useState(loadSettings)
+  const [marketInput,      setMarketInput]     = useState('')
+  const [marketSuggestions,setMarketSuggestions] = useState([])
+  const [showMarketDrop,   setShowMarketDrop]  = useState(false)
+  const [marketHighlighted,setMarketHighlighted] = useState(-1)
+  const marketInputRef = useRef(null)
+  const marketDropRef  = useRef(null)
 
   function saveSettings(next) {
     setSettings(next)
@@ -39,12 +48,56 @@ export default function AutopilotPanel({ t, API }) {
     saveSettings({ ...settings, runTime: e.target.value })
   }
 
-  function addMarket() {
-    const v = marketInput.trim()
+  // ── Market input autocomplete ────────────────────────────────────────────
+  useEffect(() => {
+    const list = getSuggestions(marketInput)
+    setMarketSuggestions(list)
+    setShowMarketDrop(marketInput.length >= 2 && list.length > 0)
+    setMarketHighlighted(-1)
+  }, [marketInput])
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (!marketDropRef.current?.contains(e.target) && !marketInputRef.current?.contains(e.target)) {
+        setShowMarketDrop(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  function addMarket(loc) {
+    const v = (loc || marketInput).trim()
     if (v && !settings.markets.includes(v)) {
       saveSettings({ ...settings, markets: [...settings.markets, v] })
     }
     setMarketInput('')
+    setShowMarketDrop(false)
+  }
+
+  function handleMarketKeyDown(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      if (showMarketDrop && marketHighlighted >= 0) {
+        const allOptions = ['United States', ...marketSuggestions]
+        addMarket(allOptions[marketHighlighted])
+      } else {
+        addMarket()
+      }
+      return
+    }
+    if (!showMarketDrop && e.key !== 'ArrowDown') return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      const total = 1 + marketSuggestions.length // 1 for "United States"
+      setShowMarketDrop(true)
+      setMarketHighlighted(h => Math.min(h + 1, total - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setMarketHighlighted(h => Math.max(h - 1, -1))
+    } else if (e.key === 'Escape') {
+      setShowMarketDrop(false)
+    }
   }
 
   function removeMarket(m) {
@@ -78,7 +131,11 @@ export default function AutopilotPanel({ t, API }) {
     setTriggering(true)
     setError(null)
     try {
-      const res = await fetch(`${API}/api/autopilot/run`, { method: 'POST' })
+      const res = await fetch(`${API}/api/autopilot/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ niches: settings.niches, markets: settings.markets }),
+      })
       if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed to start') }
       fetchState()
     } catch (err) {
@@ -100,6 +157,9 @@ export default function AutopilotPanel({ t, API }) {
   const runChartData = recentRuns.slice(0, 5).reverse().map((r, i) => ({
     run: `#${recentRuns.length - i}`, injected: r.stats?.injected || 0, failed: r.stats?.failed || 0, duration: r.duration || 0,
   }))
+
+  // Build the full dropdown list: United States pinned first, then location suggestions
+  const dropdownOptions = ['United States', ...marketSuggestions]
 
   return (
     <div>
@@ -219,35 +279,113 @@ export default function AutopilotPanel({ t, API }) {
                     {settings.markets.map(m => (
                       <span key={m} style={{
                         display: 'inline-flex', alignItems: 'center', gap: 5,
-                        background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)',
-                        borderRadius: 20, padding: '4px 10px', fontSize: 11, color: '#60a5fa', fontWeight: 600,
+                        background: m === 'United States' ? 'rgba(124,58,237,0.15)' : 'rgba(59,130,246,0.1)',
+                        border: m === 'United States' ? '1px solid rgba(124,58,237,0.4)' : '1px solid rgba(59,130,246,0.3)',
+                        borderRadius: 20, padding: '4px 10px', fontSize: 11,
+                        color: m === 'United States' ? '#c4b5fd' : '#60a5fa', fontWeight: 600,
                       }}>
-                        {m}
-                        <button onClick={() => removeMarket(m)} style={{ background: 'none', border: 'none', color: '#60a5fa', cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: '0 0 0 2px', fontFamily: 'inherit' }}>×</button>
+                        {m === 'United States' ? '🌎 ' : ''}{m}
+                        <button onClick={() => removeMarket(m)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: '0 0 0 2px', fontFamily: 'inherit' }}>×</button>
                       </span>
                     ))}
                   </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <input
-                      value={marketInput}
-                      onChange={e => setMarketInput(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && addMarket()}
-                      placeholder={t('e.g. Tampa, FL or 77001', 'ej. Tampa, FL o 77001')}
-                      style={{
-                        flex: 1, background: 'var(--dr-surface-deep)', border: '1px solid var(--dr-border)',
-                        borderRadius: 8, padding: '8px 12px', color: 'var(--dr-text-1)',
-                        fontSize: 12, fontFamily: 'Inter, sans-serif',
-                      }}
-                    />
-                    <button
-                      onClick={addMarket}
-                      style={{
-                        padding: '8px 14px', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)',
-                        borderRadius: 8, color: '#60a5fa', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
-                      }}
-                    >
-                      + {t('Add', 'Agregar')}
-                    </button>
+
+                  {/* Autocomplete input */}
+                  <div style={{ position: 'relative' }}>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input
+                        ref={marketInputRef}
+                        value={marketInput}
+                        onChange={e => setMarketInput(e.target.value)}
+                        onKeyDown={handleMarketKeyDown}
+                        onFocus={() => {
+                          if (marketInput.length >= 2 && marketSuggestions.length > 0) setShowMarketDrop(true)
+                        }}
+                        placeholder={t('Type a city, state or zip… (e.g. Tampa, FL)', 'Escribe ciudad, estado o ZIP… (ej. Tampa, FL)')}
+                        style={{
+                          flex: 1, background: 'var(--dr-surface-deep)', border: '1px solid var(--dr-border)',
+                          borderRadius: showMarketDrop ? '8px 8px 0 0' : 8,
+                          padding: '8px 12px', color: 'var(--dr-text-1)',
+                          fontSize: 12, fontFamily: 'Inter, sans-serif', outline: 'none',
+                        }}
+                      />
+                      <button
+                        onClick={() => addMarket()}
+                        style={{
+                          padding: '8px 14px', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)',
+                          borderRadius: 8, color: '#60a5fa', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
+                        }}
+                      >
+                        + {t('Add', 'Agregar')}
+                      </button>
+                    </div>
+
+                    {/* Dropdown */}
+                    <AnimatePresence>
+                      {showMarketDrop && (
+                        <motion.div
+                          ref={marketDropRef}
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          transition={{ duration: 0.1 }}
+                          style={{
+                            position: 'absolute', top: '100%', left: 0,
+                            right: 14 + 8 + 46, // width of "Add" button + gap
+                            background: 'var(--dr-dropdown-bg)',
+                            border: '1px solid #3b82f6', borderTop: 'none',
+                            borderRadius: '0 0 10px 10px',
+                            zIndex: 1000, overflow: 'hidden',
+                            boxShadow: '0 16px 32px rgba(0,0,0,0.25)',
+                            maxHeight: 260, overflowY: 'auto',
+                          }}
+                        >
+                          {dropdownOptions.map((loc, i) => {
+                            const isUS = loc === 'United States'
+                            const alreadyAdded = settings.markets.includes(loc)
+                            return (
+                              <div
+                                key={loc}
+                                onMouseEnter={() => setMarketHighlighted(i)}
+                                onMouseLeave={() => setMarketHighlighted(-1)}
+                                onMouseDown={() => { if (!alreadyAdded) addMarket(loc) }}
+                                style={{
+                                  padding: '10px 14px',
+                                  display: 'flex', alignItems: 'center', gap: 10,
+                                  background: marketHighlighted === i ? 'rgba(59,130,246,0.12)' : isUS ? 'rgba(124,58,237,0.06)' : 'transparent',
+                                  borderBottom: i < dropdownOptions.length - 1 ? '1px solid var(--dr-border)' : 'none',
+                                  cursor: alreadyAdded ? 'default' : 'pointer',
+                                  opacity: alreadyAdded ? 0.5 : 1,
+                                }}
+                              >
+                                <span style={{ fontSize: 14, flexShrink: 0 }}>
+                                  {isUS ? '🌎' : /\d{5}/.test(loc) ? '📮' : '📍'}
+                                </span>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: 12, color: isUS ? '#c4b5fd' : 'var(--dr-text-3)', fontWeight: isUS ? 700 : 400 }}>
+                                    {loc}
+                                    {isUS && <span style={{ fontSize: 10, color: '#a78bfa', marginLeft: 6 }}>— scan all US markets</span>}
+                                  </div>
+                                  {alreadyAdded && <div style={{ fontSize: 10, color: 'var(--dr-text-faintest)' }}>already added</div>}
+                                </div>
+                                <span style={{ fontSize: 11, color: '#3b82f6', flexShrink: 0 }}>
+                                  {marketHighlighted === i ? '↵' : ''}
+                                </span>
+                              </div>
+                            )
+                          })}
+                          <div style={{ padding: '6px 14px', fontSize: 10, color: 'var(--dr-text-faintest)', background: 'var(--dr-surface-deep)', display: 'flex', gap: 14 }}>
+                            <span>↑↓ {t('navigate', 'navegar')}</span>
+                            <span>↵ {t('add', 'agregar')}</span>
+                            <span>Esc {t('close', 'cerrar')}</span>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  <div style={{ fontSize: 11, color: 'var(--dr-text-faintest)', marginTop: 6 }}>
+                    {t('Type to search locations, or select "United States" to scan nationally', 'Escribe para buscar ubicaciones, o selecciona "United States" para escanear a nivel nacional')}
                   </div>
                 </div>
 
@@ -499,7 +637,6 @@ export default function AutopilotPanel({ t, API }) {
             </div>
           </div>
 
-          {/* Export buttons — always visible; CSV greys out until data exists */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {s.lastExportUrl ? (
               <a

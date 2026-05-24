@@ -40,17 +40,47 @@ async function rateLimitedRequest(fn, delayMs = 500) {
   return fn();
 }
 
-async function step1_selectTopZipCodes() {
-  addLog('Step 1: Evaluating US zip codes for wholesale leverage signals...');
-  const mockZipCodes = [
-    { zip: '30315', city: 'Atlanta, GA', dom: 67, priceDrop: 38, listToSale: 94.2 },
-    { zip: '77051', city: 'Houston, TX', dom: 72, priceDrop: 42, listToSale: 93.1 },
-    { zip: '35208', city: 'Birmingham, AL', dom: 58, priceDrop: 31, listToSale: 95.4 },
-    { zip: '29405', city: 'Charleston, SC', dom: 61, priceDrop: 35, listToSale: 94.8 },
-    { zip: '70805', city: 'Baton Rouge, LA', dom: 80, priceDrop: 45, listToSale: 92.3 },
-  ];
+const ALL_MOCK_ZIP_CODES = [
+  { zip: '30315', city: 'Atlanta, GA',       dom: 67, priceDrop: 38, listToSale: 94.2 },
+  { zip: '77051', city: 'Houston, TX',       dom: 72, priceDrop: 42, listToSale: 93.1 },
+  { zip: '35208', city: 'Birmingham, AL',    dom: 58, priceDrop: 31, listToSale: 95.4 },
+  { zip: '29405', city: 'Charleston, SC',    dom: 61, priceDrop: 35, listToSale: 94.8 },
+  { zip: '70805', city: 'Baton Rouge, LA',   dom: 80, priceDrop: 45, listToSale: 92.3 },
+  { zip: '75217', city: 'Dallas, TX',        dom: 63, priceDrop: 36, listToSale: 94.5 },
+  { zip: '76104', city: 'Fort Worth, TX',    dom: 55, priceDrop: 33, listToSale: 95.1 },
+  { zip: '33142', city: 'Miami, FL',         dom: 70, priceDrop: 40, listToSale: 93.5 },
+  { zip: '33610', city: 'Tampa, FL',         dom: 65, priceDrop: 37, listToSale: 94.0 },
+  { zip: '32209', city: 'Jacksonville, FL',  dom: 75, priceDrop: 43, listToSale: 92.8 },
+  { zip: '85031', city: 'Phoenix, AZ',       dom: 60, priceDrop: 34, listToSale: 94.7 },
+  { zip: '89115', city: 'Las Vegas, NV',     dom: 78, priceDrop: 44, listToSale: 93.0 },
+];
 
-  const qualified = mockZipCodes.filter(
+async function step1_selectTopZipCodes(configuredMarkets = []) {
+  addLog('Step 1: Evaluating target markets for wholesale leverage signals...');
+
+  const isNational = configuredMarkets.length === 0 ||
+    configuredMarkets.some(m => /united states/i.test(m) || m.trim() === 'US');
+
+  let pool;
+  if (isNational) {
+    pool = ALL_MOCK_ZIP_CODES;
+    addLog('Scanning all US markets...');
+  } else {
+    pool = ALL_MOCK_ZIP_CODES.filter(z =>
+      configuredMarkets.some(m => {
+        const city = m.split(',')[0].trim().toLowerCase();
+        return z.city.toLowerCase().includes(city);
+      })
+    );
+    if (pool.length === 0) {
+      addLog(`No exact zip matches for configured markets — scanning all US`, 'warn');
+      pool = ALL_MOCK_ZIP_CODES;
+    } else {
+      addLog(`Filtering to ${configuredMarkets.length} configured market(s): ${configuredMarkets.join(', ')}`);
+    }
+  }
+
+  const qualified = pool.filter(
     z => z.dom > 50 && z.priceDrop > 30 && z.listToSale < 96
   ).slice(0, 3);
 
@@ -58,8 +88,12 @@ async function step1_selectTopZipCodes() {
   return qualified;
 }
 
-async function step2_extractDistressedProperties(zipCodes) {
+const DEFAULT_DISTRESS_TYPES = ['Foreclosure', 'Tax Delinquency', 'Inherited House'];
+
+async function step2_extractDistressedProperties(zipCodes, selectedNiches = []) {
   addLog('Step 2: Extracting distressed properties via list-stacking criteria...');
+  const distressTypes = selectedNiches.length > 0 ? selectedNiches : DEFAULT_DISTRESS_TYPES;
+  addLog(`Using distress categories: ${distressTypes.join(', ')}`);
   const properties = [];
 
   for (const zipInfo of zipCodes) {
@@ -70,7 +104,6 @@ async function step2_extractDistressedProperties(zipCodes) {
       const streetNum = 1000 + Math.floor(Math.random() * 8000);
       const streets = ['Oak Ave', 'Maple St', 'Pine Rd', 'Cedar Blvd', 'Elm Dr', 'Birch Ln', 'Peach Tree St', 'Magnolia Way', 'Sunset Blvd', 'River Rd'];
       const street = streets[Math.floor(Math.random() * streets.length)];
-      const distressTypes = ['Pre-Foreclosure', 'Probate', 'Tax Delinquency'];
       const distress = distressTypes[Math.floor(Math.random() * distressTypes.length)];
       const arv = 120000 + Math.floor(Math.random() * 280000);
       const targetOffer = Math.round(arv * 0.70);
@@ -232,7 +265,7 @@ async function step5_injectGHL(records) {
   return { injected, failed };
 }
 
-async function runAutopilot() {
+async function runAutopilot({ niches = [], markets = [] } = {}) {
   if (autopilotState.isRunning) {
     addLog('Autopilot already running — skipping trigger', 'warn');
     return;
@@ -242,6 +275,8 @@ async function runAutopilot() {
   autopilotState.isRunning = true;
   autopilotState.stats.totalRuns++;
   addLog('=== AUTOPILOT DEAL HUNTER STARTED ===');
+  if (niches.length > 0)   addLog(`Configured niches: ${niches.join(', ')}`);
+  if (markets.length > 0)  addLog(`Configured markets: ${markets.join(', ')}`);
 
   const runRecord = {
     id: uuidv4(),
@@ -252,10 +287,10 @@ async function runAutopilot() {
   };
 
   try {
-    const zipCodes = await step1_selectTopZipCodes();
+    const zipCodes = await step1_selectTopZipCodes(markets);
     runRecord.steps.push({ step: 1, status: 'done', result: zipCodes });
 
-    const properties = await step2_extractDistressedProperties(zipCodes);
+    const properties = await step2_extractDistressedProperties(zipCodes, niches);
     runRecord.steps.push({ step: 2, status: 'done', count: properties.length });
 
     const enriched = await step3_skipTrace(properties);

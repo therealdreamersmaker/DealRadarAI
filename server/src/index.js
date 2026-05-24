@@ -119,7 +119,8 @@ app.post('/api/autopilot/run', async (req, res) => {
   if (state.isRunning) {
     return res.status(409).json({ error: 'Autopilot is already running' });
   }
-  runAutopilot().catch(console.error);
+  const { niches = [], markets = [] } = req.body || {};
+  runAutopilot({ niches, markets }).catch(console.error);
   res.json({ message: 'Autopilot started', startedAt: new Date().toISOString() });
 });
 
