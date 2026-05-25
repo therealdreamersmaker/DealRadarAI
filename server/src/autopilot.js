@@ -109,7 +109,8 @@ Return ONLY a raw JSON array of exactly 10 objects — no markdown, no code fenc
     "baths": number (1, 1.5, 2, 2.5, or 3),
     "sqft": number (900-2800),
     "yearBuilt": number (1945-2005),
-    "note": "1-2 sentences describing the owner situation and why it is a strong wholesale opportunity"
+    "note": "1-2 sentences describing the owner situation and why it is a strong wholesale opportunity",
+    "dealScore": number (1-10: wholesale opportunity rating. 10=screaming deal, 7-9=strong, 5-6=solid, 3-4=average, 1-2=pass. Base on: equity %, distress urgency, DOM, and price vs ARV)
   }
 ]
 
@@ -186,6 +187,7 @@ async function step2_extractDistressedProperties(zipCodes, selectedNiches = []) 
           sqft:        Number(p.sqft)        || 1400,
           yearBuilt:   Number(p.yearBuilt)   || 1975,
           note:        p.note || '',
+          dealScore:   Number(p.dealScore)  || 6,
           dataSource:  'ai-estimate',
         });
       }

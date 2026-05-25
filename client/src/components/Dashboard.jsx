@@ -133,7 +133,7 @@ const TIER_COLORS = ['#ef4444', '#f59e0b', '#22c55e']
 const TIER_LABELS = ['Aggressive', 'Moderate', 'Highest Acceptable']
 
 // ── Main Dashboard ────────────────────────────────────────────────────────────
-export default function Dashboard({ data, loading, onScanMore, scanLoading, language, t }) {
+export default function Dashboard({ data, loading, onScanMore, scanLoading, language, t, API = '' }) {
   const { chart } = useTheme()
   if (loading) return <LoadingSkeleton />
   if (!data) return null
@@ -314,7 +314,7 @@ export default function Dashboard({ data, loading, onScanMore, scanLoading, lang
             {/* Cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
               {opps.map((opp, i) => (
-                <OpportunityCard key={`${cat.key}-${opp.address || opp.type}-${i}`} opp={opp} index={i} t={t} />
+                <OpportunityCard key={`${cat.key}-${opp.address || opp.type}-${i}`} opp={opp} index={i} t={t} API={API} />
               ))}
             </div>
           </motion.div>

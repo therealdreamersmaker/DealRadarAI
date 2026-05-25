@@ -134,6 +134,7 @@ export default function App() {
                           scanLoading={scanLoading}
                           language={language}
                           t={t}
+                          API={API}
                         />
                       </motion.div>
                     )}
@@ -170,6 +171,7 @@ export default function App() {
                   scanLoading={scanLoading}
                   language={language}
                   t={t}
+                  API={API}
                 />
               ) : (
                 <div style={{

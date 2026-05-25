@@ -4,11 +4,13 @@ const cors = require('cors');
 const cron = require('node-cron');
 const path = require('path');
 const fs = require('fs');
+const axios = require('axios');
 
 const { analyzeMarket, scanMoreOpportunities } = require('./marketAnalysis');
 const { generateChat } = require('./llmService');
 const { runAutopilot, getState, getLeads, EXPORTS_DIR } = require('./autopilot');
 const { hasRentcast } = require('./listingsService');
+const { generateScripts, generateMemo } = require('./aiTools');
 
 const app = express();
 app.use(cors());
@@ -77,6 +79,59 @@ app.post('/api/chat', async (req, res) => {
   } catch (err) {
     console.error('[/api/chat]', err);
     res.status(500).json({ error: err.message || 'Chat failed' });
+  }
+});
+
+// ── AI Tools ─────────────────────────────────────────────────────────────────
+
+app.post('/api/ai-tools/scripts', async (req, res) => {
+  const { property, language = 'en' } = req.body;
+  if (!property) return res.status(400).json({ error: 'Property data required' });
+  try {
+    const scripts = await generateScripts(property, language);
+    res.json(scripts);
+  } catch (err) {
+    console.error('[/api/ai-tools/scripts]', err.message);
+    res.status(500).json({ error: err.message || 'Script generation failed' });
+  }
+});
+
+app.post('/api/ai-tools/memo', async (req, res) => {
+  const { property, language = 'en' } = req.body;
+  if (!property) return res.status(400).json({ error: 'Property data required' });
+  try {
+    const memo = await generateMemo(property, language);
+    res.json(memo);
+  } catch (err) {
+    console.error('[/api/ai-tools/memo]', err.message);
+    res.status(500).json({ error: err.message || 'Memo generation failed' });
+  }
+});
+
+// Walk Score proxy — requires WALKSCORE_API_KEY env var (free at walkscore.com/professional/api.php)
+app.get('/api/walkscore', async (req, res) => {
+  const key = process.env.WALKSCORE_API_KEY;
+  if (!key) return res.json({ available: false, reason: 'WALKSCORE_API_KEY not set' });
+  const { address } = req.query;
+  if (!address) return res.status(400).json({ error: 'address query param required' });
+  try {
+    const response = await axios.get('https://api.walkscore.com/score', {
+      params: { format: 'json', address, wsapikey: key, transit: 1, bike: 1 },
+      timeout: 6000,
+    });
+    const d = response.data;
+    res.json({
+      available:        true,
+      walkScore:        d.walkscore,
+      walkDescription:  d.description,
+      transitScore:     d.transit?.score    ?? null,
+      transitDesc:      d.transit?.description ?? null,
+      bikeScore:        d.bike?.score       ?? null,
+      bikeDesc:         d.bike?.description ?? null,
+    });
+  } catch (err) {
+    console.error('[/api/walkscore]', err.message);
+    res.json({ available: false, error: err.message });
   }
 });
 

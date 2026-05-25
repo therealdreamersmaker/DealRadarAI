@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import AIToolsModal from './AIToolsModal'
 
 const fmt = n => n != null ? `$${Number(n).toLocaleString()}` : '—'
 
@@ -28,14 +29,15 @@ const ALL_FILTER_NICHES = [
 ]
 
 export default function LeadsTable({ API, t, totalLeadsInState }) {
-  const [leads,    setLeads]    = useState([])
-  const [total,    setTotal]    = useState(0)
-  const [pages,    setPages]    = useState(1)
-  const [page,     setPage]     = useState(1)
-  const [search,   setSearch]   = useState('')
-  const [filter,   setFilter]   = useState('all')
-  const [loading,  setLoading]  = useState(false)
-  const [expanded, setExpanded] = useState(null)
+  const [leads,        setLeads]        = useState([])
+  const [total,        setTotal]        = useState(0)
+  const [pages,        setPages]        = useState(1)
+  const [page,         setPage]         = useState(1)
+  const [search,       setSearch]       = useState('')
+  const [filter,       setFilter]       = useState('all')
+  const [loading,      setLoading]      = useState(false)
+  const [expanded,     setExpanded]     = useState(null)
+  const [aiToolsLead,  setAiToolsLead]  = useState(null)
 
   const PAGE_SIZE = 25
 
@@ -306,6 +308,23 @@ export default function LeadsTable({ API, t, totalLeadsInState }) {
                                 <p style={{ fontSize: 12, color: 'var(--dr-text-3)', lineHeight: 1.6, margin: 0 }}>{lead.note}</p>
                               </div>
                             )}
+
+                            {/* AI Tools launch button */}
+                            <div style={{ gridColumn: '1 / -1' }}>
+                              <button
+                                onClick={() => setAiToolsLead(lead)}
+                                style={{
+                                  width: '100%', padding: '10px 16px', borderRadius: 10,
+                                  background: 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(37,99,235,0.12))',
+                                  border: '1px solid rgba(124,58,237,0.3)',
+                                  color: '#a78bfa', fontSize: 12, fontWeight: 700,
+                                  cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                                }}
+                              >
+                                🤖 {t('Open AI Tools — Outreach Scripts & Deal Memo', 'Abrir Herramientas IA — Scripts y Memo')}
+                              </button>
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -338,6 +357,17 @@ export default function LeadsTable({ API, t, totalLeadsInState }) {
             {t(`Page ${page} of ${pages}`, `Página ${page} de ${pages}`)}
           </span>
         </div>
+      )}
+
+      {/* AI Tools Modal (for autopilot leads) */}
+      {aiToolsLead && (
+        <AIToolsModal
+          property={aiToolsLead}
+          API={API}
+          language="en"
+          t={t}
+          onClose={() => setAiToolsLead(null)}
+        />
       )}
     </div>
   )
