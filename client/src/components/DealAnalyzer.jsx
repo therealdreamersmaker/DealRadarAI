@@ -3,19 +3,23 @@
  * Analyze any property by Zillow/Redfin URL or address.
  * Returns full AI wholesale analysis: ARV, offer, comps, exit strategies, etc.
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import {
+  addToHistory, getHistory,
+  analysisToSaveEntry, saveDeal, isSaved, unsaveDeal,
+} from '../utils/savedDeals'
 
 const fmt  = n => n != null ? `$${Number(n).toLocaleString()}` : '—'
 const fmtN = n => n != null ? Number(n).toLocaleString() : '—'
 
 // ── Score / verdict helpers ───────────────────────────────────────────────────
 function scoreStyle(s) {
-  if (s >= 9) return { color: '#22c55e', bg: 'rgba(34,197,94,0.12)',  border: 'rgba(34,197,94,0.35)',  label: s >= 9 ? 'HOT DEAL' : 'STRONG' }
-  if (s >= 7) return { color: '#fbbf24', bg: 'rgba(251,191,36,0.12)', border: 'rgba(251,191,36,0.35)', label: 'STRONG'  }
-  if (s >= 5) return { color: '#60a5fa', bg: 'rgba(96,165,250,0.12)', border: 'rgba(96,165,250,0.35)', label: 'SOLID'   }
-  if (s >= 3) return { color: '#f97316', bg: 'rgba(249,115,22,0.12)', border: 'rgba(249,115,22,0.35)', label: 'AVERAGE' }
-  return            { color: '#ef4444', bg: 'rgba(239,68,68,0.12)',   border: 'rgba(239,68,68,0.35)',  label: 'PASS'    }
+  if (s >= 9) return { color: '#22c55e', bg: 'rgba(34,197,94,0.12)',  border: 'rgba(34,197,94,0.35)',  label: 'HOT DEAL' }
+  if (s >= 7) return { color: '#fbbf24', bg: 'rgba(251,191,36,0.12)', border: 'rgba(251,191,36,0.35)', label: 'STRONG'   }
+  if (s >= 5) return { color: '#60a5fa', bg: 'rgba(96,165,250,0.12)', border: 'rgba(96,165,250,0.35)', label: 'SOLID'    }
+  if (s >= 3) return { color: '#f97316', bg: 'rgba(249,115,22,0.12)', border: 'rgba(249,115,22,0.35)', label: 'AVERAGE'  }
+  return            { color: '#ef4444', bg: 'rgba(239,68,68,0.12)',   border: 'rgba(239,68,68,0.35)',  label: 'PASS'     }
 }
 const VERDICT_CFG = {
   'GO':        { color: '#22c55e', bg: 'rgba(34,197,94,0.15)',  border: 'rgba(34,197,94,0.45)',  icon: '🟢' },
@@ -24,6 +28,121 @@ const VERDICT_CFG = {
 }
 const NBHD_LABEL = { A: 'Prime', B: 'Good', C: 'Average', D: 'Distressed' }
 const NBHD_COLOR = { A: '#22c55e', B: '#60a5fa', C: '#fbbf24', D: '#f87171' }
+
+// ── Stable save-id derived from result address ────────────────────────────────
+function buildSaveId(result) {
+  const addr = (result.address || 'unknown').replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 60)
+  return `analyzer-${addr}`
+}
+
+// ── PDF print ─────────────────────────────────────────────────────────────────
+function printAnalysis(result) {
+  const ss = scoreStyle(result.dealScore || 5)
+  const vc = VERDICT_CFG[result.verdict] || VERDICT_CFG['WATCHLIST']
+  const p  = result.ppsftComparison
+  const fD = n => n != null ? `$${Number(n).toLocaleString()}` : '—'
+  const fL = n => n != null ? Number(n).toLocaleString() : '—'
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Deal Analysis — ${result.address || 'Property'}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;background:#0f172a;color:#e2e8f0;padding:32px;font-size:13px;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .badge{display:inline-flex;align-items:center;gap:6px;padding:5px 13px;border-radius:20px;font-weight:800;font-size:12px;border:1px solid transparent;margin-right:6px}
+    .g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+    .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}
+    .card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:16px}
+    .ct{font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#64748b;margin-bottom:10px}
+    .row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #0f172a;font-size:11px}
+    .row:last-child{border-bottom:none}
+    .mu{color:#64748b}
+    .mo{font-family:'JetBrains Mono','Courier New',monospace;font-weight:700}
+    .st{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#64748b;margin:20px 0 10px;border-top:1px solid #334155;padding-top:14px}
+    table{width:100%;border-collapse:collapse;font-size:11px;margin-top:6px}
+    th{padding:7px 10px;text-align:left;color:#64748b;font-weight:700;font-size:9px;text-transform:uppercase;background:#0f172a}
+    td{padding:7px 10px;border-bottom:1px solid #0f172a}
+    .hbox{background:#1e293b;border:1px solid #2563eb55;border-radius:16px;padding:22px 24px;margin-bottom:18px}
+    .rec{background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.18);border-radius:8px;padding:10px 14px;font-size:12px;color:#94a3b8;line-height:1.7;margin-top:12px}
+    .foot{margin-top:24px;font-size:10px;color:#475569;border-top:1px solid #334155;padding-top:12px}
+    @media print{body{background:#0f172a!important}}
+  </style>
+</head>
+<body>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+    <div style="width:32px;height:32px;background:linear-gradient(135deg,#2563eb,#7c3aed);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px">📡</div>
+    <div>
+      <div style="font-weight:800;font-size:14px;color:#f1f5f9">DealRadar AI — Property Analysis</div>
+      <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.1em">Generated ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</div>
+    </div>
+  </div>
+  <div class="hbox">
+    <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">${result.platform ? `📍 Sourced from ${result.platform}` : '📍 Property Analysis'}</div>
+    <h1 style="font-size:22px;font-weight:900;color:#f1f5f9;letter-spacing:-.5px;margin-bottom:10px">${result.address || 'Unknown Address'}</h1>
+    <div>
+      <span class="badge" style="background:${vc.bg};border-color:${vc.border};color:${vc.color}">${vc.icon} ${result.verdict}</span>
+      <span class="badge" style="background:${ss.bg};border-color:${ss.border};color:${ss.color}">⭐ ${result.dealScore}/10 — ${result.dealScoreLabel || ''}</span>
+      ${result.neighborhood ? `<span class="badge" style="background:rgba(30,41,59,.8);border-color:#334155;color:#94a3b8">🏘 ${result.neighborhood}-Class Neighborhood</span>` : ''}
+      ${result.marketTrend ? `<span class="badge" style="background:rgba(96,165,250,.1);border-color:rgba(96,165,250,.25);color:#60a5fa">📈 ${result.marketTrend}</span>` : ''}
+    </div>
+    ${result.recommendation ? `<div class="rec">💡 ${result.recommendation}</div>` : ''}
+  </div>
+  <div class="g2">
+    <div class="card">
+      <div class="ct">🏠 Property Details</div>
+      ${[['Type',result.propertyType],['Beds',result.beds?`${result.beds} bd`:'—'],['Baths',result.baths?`${result.baths} ba`:'—'],['Sqft',result.sqft?`${fL(result.sqft)} sqft`:'—'],['Year Built',result.yearBuilt??'—'],['Est. DOM',result.estimatedDom?`${result.estimatedDom} days`:'—'],['Distress',result.distressType||'—']].map(([l,v])=>`<div class="row"><span class="mu">${l}</span><span class="mo" style="color:#e2e8f0">${v||'—'}</span></div>`).join('')}
+    </div>
+    <div class="card">
+      <div class="ct">💰 Financial Analysis</div>
+      ${[['As-Is Value',fD(result.estimatedValue),'#94a3b8'],['ARV (After Repair)',fD(result.arv),'#60a5fa'],['Target Offer (70%)',fD(result.targetOffer),'#f97316'],['Est. Profit',result.arv&&result.targetOffer?fD(result.arv-result.targetOffer):'—','#22c55e'],['Equity Spread',result.equitySpread!=null?`${result.equitySpread}%`:'—','#a78bfa']].map(([l,v,c])=>`<div class="row"><span class="mu">${l}</span><span class="mo" style="color:${c}">${v}</span></div>`).join('')}
+    </div>
+  </div>
+  ${p ? `
+  <div class="st">📐 Price Per Sqft Comparison</div>
+  <div class="card">
+    <div class="row"><span class="mu">This Property</span><span class="mo" style="color:#60a5fa">$${fL(p.subject)}/sqft</span></div>
+    <div class="row"><span class="mu">ZIP ${p.zipLabel||''} Avg</span><span class="mo" style="color:#e2e8f0">$${fL(p.zipAvg)}/sqft</span></div>
+    <div class="row"><span class="mu">${p.cityLabel||'City'} Avg</span><span class="mo" style="color:#e2e8f0">$${fL(p.cityAvg)}/sqft</span></div>
+    <div class="row"><span class="mu">${p.stateLabel||'State'} Avg</span><span class="mo" style="color:#e2e8f0">$${fL(p.stateAvg)}/sqft</span></div>
+  </div>` : ''}
+  ${result.repairEstimate ? `
+  <div class="st">🔨 Repair Cost Estimates</div>
+  <div class="g3">
+    ${[['💅 Light',result.repairEstimate.light,result.repairEstimate.lightDesc,'#22c55e'],['🔧 Medium',result.repairEstimate.medium,result.repairEstimate.mediumDesc,'#fbbf24'],['🏗 Heavy',result.repairEstimate.heavy,result.repairEstimate.heavyDesc,'#f87171']].map(([lbl,cost,desc,c])=>`<div class="card" style="border-color:${c}33"><div style="font-size:10px;font-weight:700;color:${c};margin-bottom:4px">${lbl}</div><div class="mo" style="font-size:18px;color:${c};margin-bottom:4px">${fD(cost)}</div>${desc?`<div style="font-size:10px;color:#64748b;line-height:1.5">${desc}</div>`:''}</div>`).join('')}
+  </div>` : ''}
+  ${result.exitStrategies?.length > 0 ? `
+  <div class="st">🚀 Exit Strategy Analysis</div>
+  <div class="g3">
+    ${result.exitStrategies.map((es,i)=>{const cs=['#22c55e','#3b82f6','#a78bfa'];const c=cs[i]||'#60a5fa';return`<div class="card" style="border-color:${c}33"><div style="font-size:11px;font-weight:800;color:${c};margin-bottom:6px">${es.strategy}</div>${es.strategy==='Buy & Hold'?`<div class="mo" style="font-size:16px;color:${c}">${fD(es.projectedMonthlyRent)}/mo</div><div style="font-size:10px;color:#64748b;margin-top:4px">Cap Rate: ${es.capRate||'—'}% · Cash Flow: ${fD(es.monthlyCashFlow)}/mo</div>`:`<div class="mo" style="font-size:16px;color:${c}">${fD(es.projectedProfit)}</div><div style="font-size:10px;color:#64748b;margin-top:4px">Timeline: ${es.timeline||'—'}</div>`}${es.notes?`<div style="font-size:10px;color:#475569;margin-top:6px;border-top:1px solid #334155;padding-top:4px">${es.notes}</div>`:''}</div>`}).join('')}
+  </div>` : ''}
+  ${result.comps?.length > 0 ? `
+  <div class="st">🏡 Comparable Sales</div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <table>
+      <thead><tr>${['Address','Sold','Date','Beds/Ba','Sqft','$/sqft','Cond.'].map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+      <tbody>${result.comps.map(c=>`<tr><td style="color:#e2e8f0;font-weight:600">${c.address||'—'}</td><td class="mo" style="color:#22c55e">${fD(c.soldPrice)}</td><td style="color:#64748b">${c.soldDate||'—'}</td><td style="color:#94a3b8">${c.beds||'—'}bd/${c.baths||'—'}ba</td><td class="mo" style="color:#94a3b8">${fL(c.sqft)}</td><td class="mo" style="color:#a78bfa">$${fL(c.pricePerSqft)}</td><td>${c.condition||'—'}</td></tr>`).join('')}</tbody>
+    </table>
+  </div>` : ''}
+  ${result.insights?.length > 0 || result.redFlags?.length > 0 || result.negotiationTips?.length > 0 ? `
+  <div class="st">✦ Insights &amp; Analysis</div>
+  <div class="g3">
+    ${result.insights?.length > 0 ? `<div class="card" style="border-color:rgba(34,197,94,.25)"><div class="ct" style="color:#4ade80">✦ Deal Insights</div>${result.insights.map(b=>`<div style="font-size:11px;color:#86efac;padding:4px 0;line-height:1.6">${b}</div>`).join('')}</div>` : ''}
+    ${result.redFlags?.length > 0 ? `<div class="card" style="border-color:rgba(239,68,68,.25)"><div class="ct" style="color:#f87171">⚠️ Red Flags</div>${result.redFlags.map(b=>`<div style="font-size:11px;color:#fca5a5;padding:4px 0;line-height:1.6">${b}</div>`).join('')}</div>` : ''}
+    ${result.negotiationTips?.length > 0 ? `<div class="card" style="border-color:rgba(251,191,36,.25)"><div class="ct" style="color:#fbbf24">🤝 Negotiation</div>${result.negotiationTips.map(b=>`<div style="font-size:11px;color:#fde68a;padding:4px 0;line-height:1.6">${b}</div>`).join('')}</div>` : ''}
+  </div>` : ''}
+  ${result.marketContext ? `
+  <div class="st">🗺 Market Context</div>
+  <div class="card"><p style="font-size:12px;color:#94a3b8;line-height:1.75">${result.marketContext}</p></div>` : ''}
+  <div class="foot">🤖 AI Analysis Disclaimer: All figures (ARV, comps, repair costs, rents) are AI-estimated. Always verify with a local agent, appraiser, or inspector before making an offer. | DealRadar AI · ${new Date().getFullYear()}</div>
+  <script>window.print()</script>
+</body>
+</html>`
+
+  const win = window.open('', '_blank')
+  if (win) { win.document.write(html); win.document.close() }
+}
 
 // ── PricePerSqft comparison bar ───────────────────────────────────────────────
 function PpsfBar({ label, value, max, highlight }) {
@@ -55,10 +174,17 @@ function Card({ title, icon, children, color = 'var(--dr-border-blue)', style = 
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function DealAnalyzer({ API, t, language }) {
-  const [input,    setInput]    = useState('')
-  const [loading,  setLoading]  = useState(false)
-  const [error,    setError]    = useState(null)
-  const [result,   setResult]   = useState(null)
+  const [input,   setInput]   = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error,   setError]   = useState(null)
+  const [result,  setResult]  = useState(null)
+  const [saved,   setSaved]   = useState(false)
+  const [history, setHistory] = useState([])
+
+  // Load history from localStorage on mount
+  useEffect(() => {
+    setHistory(getHistory())
+  }, [])
 
   async function handleAnalyze(e) {
     e.preventDefault()
@@ -66,6 +192,7 @@ export default function DealAnalyzer({ API, t, language }) {
     setLoading(true)
     setError(null)
     setResult(null)
+    setSaved(false)
     try {
       const res = await fetch(`${API}/api/analyze-property`, {
         method:  'POST',
@@ -76,11 +203,47 @@ export default function DealAnalyzer({ API, t, language }) {
         const d = await res.json().catch(() => ({}))
         throw new Error(d.error || `Server error ${res.status}`)
       }
-      setResult(await res.json())
+      const data = await res.json()
+      setResult(data)
+
+      // Auto-store every search in analyzer history
+      addToHistory({
+        id:         `hist-${Date.now().toString(36)}`,
+        searchedAt: new Date().toISOString(),
+        input:      input.trim(),
+        address:    data.address,
+        result:     data,
+      })
+      setHistory(getHistory())
+
+      // Sync saved state with Deal Bank
+      setSaved(isSaved(buildSaveId(data)))
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  function handleLoadHistory(entry) {
+    setInput(entry.input)
+    if (entry.result) {
+      setResult(entry.result)
+      setSaved(isSaved(buildSaveId(entry.result)))
+      setError(null)
+    }
+  }
+
+  function handleSave() {
+    if (!result) return
+    const id = buildSaveId(result)
+    if (saved) {
+      unsaveDeal(id)
+      setSaved(false)
+    } else {
+      const entry = { ...analysisToSaveEntry(result), id }
+      saveDeal(entry)
+      setSaved(true)
     }
   }
 
@@ -91,7 +254,7 @@ export default function DealAnalyzer({ API, t, language }) {
     <div style={{ maxWidth: 1100, margin: '0 auto' }}>
 
       {/* ── Input form ───────────────────────────────────────────────── */}
-      <form onSubmit={handleAnalyze} style={{ marginBottom: 28 }}>
+      <form onSubmit={handleAnalyze} style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'stretch' }}>
           <div style={{ flex: 1, position: 'relative' }}>
             <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 18, pointerEvents: 'none' }}>🔬</span>
@@ -109,8 +272,8 @@ export default function DealAnalyzer({ API, t, language }) {
                 borderRadius: 13, color: 'var(--dr-text-2)', fontSize: 14,
                 fontFamily: 'Inter, sans-serif', outline: 'none',
               }}
-              onFocus={e  => e.target.style.borderColor = '#3b82f6'}
-              onBlur={e   => e.target.style.borderColor = 'var(--dr-border-blue)'}
+              onFocus={e => e.target.style.borderColor = '#3b82f6'}
+              onBlur={e  => e.target.style.borderColor = 'var(--dr-border-blue)'}
             />
           </div>
           <button
@@ -153,6 +316,37 @@ export default function DealAnalyzer({ API, t, language }) {
           ))}
         </div>
       </form>
+
+      {/* ── Recent history chips ──────────────────────────────────────── */}
+      {history.length > 0 && !result && !loading && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--dr-text-faint)', marginBottom: 8 }}>
+            🕐 {t('Recent Searches', 'Búsquedas Recientes')}
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {history.slice(0, 8).map(h => (
+              <button
+                key={h.id}
+                onClick={() => handleLoadHistory(h)}
+                style={{
+                  fontSize: 11, padding: '5px 12px', borderRadius: 20,
+                  background: 'var(--dr-surface)', border: '1px solid var(--dr-border)',
+                  color: 'var(--dr-text-muted)', cursor: 'pointer',
+                  fontFamily: 'Inter, sans-serif', transition: 'all 0.15s',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.color = '#60a5fa' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--dr-border)'; e.currentTarget.style.color = 'var(--dr-text-muted)' }}
+              >
+                <span style={{ fontSize: 9, color: 'var(--dr-text-faint)' }}>
+                  {new Date(h.searchedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                </span>
+                {h.address || h.input.slice(0, 45) + (h.input.length > 45 ? '…' : '')}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Error ────────────────────────────────────────────────────── */}
       {error && (
@@ -222,6 +416,45 @@ export default function DealAnalyzer({ API, t, language }) {
                 💡 {result.recommendation}
               </div>
             )}
+
+            {/* ── Action buttons ──────────────────────────────────── */}
+            <div className="no-print" style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
+              {/* Save / Unsave */}
+              <button
+                onClick={handleSave}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 7,
+                  padding: '9px 18px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                  background: saved
+                    ? 'linear-gradient(135deg, rgba(34,197,94,0.18), rgba(16,185,129,0.12))'
+                    : 'var(--dr-surface-deep)',
+                  border: saved ? '1px solid rgba(34,197,94,0.45)' : '1px solid var(--dr-border)',
+                  color: saved ? '#4ade80' : 'var(--dr-text-muted)',
+                  fontSize: 13, fontWeight: 700, fontFamily: 'Inter, sans-serif',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={e => !saved && (e.currentTarget.style.borderColor = 'rgba(34,197,94,0.35)')}
+                onMouseLeave={e => !saved && (e.currentTarget.style.borderColor = 'var(--dr-border)')}
+              >
+                {saved ? '✅' : '💾'} {saved ? t('Saved to Deal Bank', 'Guardado en Banco') : t('Save to Deal Bank', 'Guardar en Banco')}
+              </button>
+
+              {/* PDF download */}
+              <button
+                onClick={() => printAnalysis(result)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 7,
+                  padding: '9px 18px', borderRadius: 10, cursor: 'pointer',
+                  background: 'var(--dr-surface-deep)', border: '1px solid var(--dr-border)',
+                  color: 'var(--dr-text-muted)', fontSize: 13, fontWeight: 700,
+                  fontFamily: 'Inter, sans-serif', transition: 'all 0.2s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.color = '#60a5fa' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--dr-border)'; e.currentTarget.style.color = 'var(--dr-text-muted)' }}
+              >
+                📄 {t('Download PDF', 'Descargar PDF')}
+              </button>
+            </div>
           </div>
 
           {/* ── Main grid ───────────────────────────────────────── */}
@@ -378,7 +611,6 @@ export default function DealAnalyzer({ API, t, language }) {
 
           {/* ── Insights + Red Flags + Negotiation ───────────────── */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginBottom: 16 }}>
-            {/* Deal insights */}
             {result.insights?.length > 0 && (
               <Card title="Deal Insights" icon="✦" color="rgba(34,197,94,0.25)">
                 {result.insights.map((ins, i) => (
@@ -387,7 +619,6 @@ export default function DealAnalyzer({ API, t, language }) {
               </Card>
             )}
 
-            {/* Red flags */}
             {result.redFlags?.length > 0 && (
               <Card title="Red Flags / Risks" icon="⚠️" color="rgba(239,68,68,0.25)">
                 {result.redFlags.map((rf, i) => (
@@ -396,7 +627,6 @@ export default function DealAnalyzer({ API, t, language }) {
               </Card>
             )}
 
-            {/* Negotiation tips */}
             {result.negotiationTips?.length > 0 && (
               <Card title="Negotiation Tips" icon="🤝" color="rgba(251,191,36,0.25)">
                 {result.negotiationTips.map((tip, i) => (
@@ -451,12 +681,12 @@ function EmptyHero({ t }) {
       </p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, maxWidth: 720, margin: '0 auto' }}>
         {[
-          ['🏠', 'ARV Estimate', 'AI-computed after-repair value based on local comps'],
-          ['💰', 'Target Offer', '70% ARV rule with profit projection'],
-          ['📊', 'Comparable Sales', '3–4 recent nearby sales for validation'],
-          ['🔨', 'Repair Costs', 'Light / Medium / Heavy rehab budgets'],
-          ['🚀', 'Exit Strategies', 'Wholesale · Fix & Flip · Buy & Hold analysis'],
-          ['📐', '$/sqft Comparison', 'vs ZIP, city, and state averages'],
+          ['🏠', 'ARV Estimate',         'AI-computed after-repair value based on local comps'],
+          ['💰', 'Target Offer',          '70% ARV rule with profit projection'],
+          ['📊', 'Comparable Sales',      '3–4 recent nearby sales for validation'],
+          ['🔨', 'Repair Costs',          'Light / Medium / Heavy rehab budgets'],
+          ['🚀', 'Exit Strategies',       'Wholesale · Fix & Flip · Buy & Hold analysis'],
+          ['📐', '$/sqft Comparison',     'vs ZIP, city, and state averages'],
         ].map(([icon, title, desc]) => (
           <div key={title} style={{ background: 'var(--dr-surface)', border: '1px solid var(--dr-border)', borderRadius: 12, padding: '16px 14px', textAlign: 'left' }}>
             <div style={{ fontSize: 20, marginBottom: 6 }}>{icon}</div>

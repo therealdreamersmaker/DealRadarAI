@@ -1,6 +1,13 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import AIToolsModal from './AIToolsModal'
+import { isSaved, saveDeal, unsaveDeal, oppToSaveEntry } from '../utils/savedDeals'
+
+// Build a stable, deterministic id for an opp (no timestamp) for save-state tracking
+function buildOppSaveId(opp, source) {
+  const addr = (opp.address || opp.type || 'unknown').replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 60)
+  return `${source}-${addr}`
+}
 
 const fmt = n => n != null ? `$${Number(n).toLocaleString()}` : '—'
 
@@ -184,8 +191,21 @@ function AILeadTargetCard({ opp, index, t }) {
 }
 
 // ── Real / AI-estimate listing card ──────────────────────────────────────────
-export default function OpportunityCard({ opp, index, t, API = '' }) {
+export default function OpportunityCard({ opp, index, t, API = '', source = 'finder' }) {
   const [showAITools, setShowAITools] = useState(false)
+  const saveId = buildOppSaveId(opp, source)
+  const [savedState, setSavedState] = useState(() => isSaved(saveId))
+
+  function handleSave() {
+    if (savedState) {
+      unsaveDeal(saveId)
+      setSavedState(false)
+    } else {
+      const entry = { ...oppToSaveEntry(opp, source), id: saveId }
+      saveDeal(entry)
+      setSavedState(true)
+    }
+  }
 
   if ((opp.dataSource === 'ai-target' || opp.address == null) && opp.dataSource !== 'ai-estimate') {
     return <AILeadTargetCard opp={opp} index={index} t={t} />
@@ -321,24 +341,42 @@ export default function OpportunityCard({ opp, index, t, API = '' }) {
           )}
         </div>
 
-        {/* 🤖 AI Tools button */}
-        <button
-          className="no-print"
-          onClick={() => setShowAITools(true)}
-          style={{
-            width: '100%', padding: '9px 12px', borderRadius: 8,
-            background: 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(37,99,235,0.12))',
-            border: '1px solid rgba(124,58,237,0.3)',
-            color: '#a78bfa', fontSize: 12, fontWeight: 700,
-            cursor: 'pointer', fontFamily: 'Inter, sans-serif',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            transition: 'all 0.2s',
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = 'linear-gradient(135deg, rgba(124,58,237,0.22), rgba(37,99,235,0.22))'}
-          onMouseLeave={e => e.currentTarget.style.background = 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(37,99,235,0.12))'}
-        >
-          🤖 {t('AI Tools — Scripts & Deal Memo', 'Herramientas IA — Scripts y Memo')}
-        </button>
+        {/* Bottom action row: AI Tools + Save */}
+        <div className="no-print" style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, marginTop: 0 }}>
+          <button
+            onClick={() => setShowAITools(true)}
+            style={{
+              padding: '9px 12px', borderRadius: 8,
+              background: 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(37,99,235,0.12))',
+              border: '1px solid rgba(124,58,237,0.3)',
+              color: '#a78bfa', fontSize: 12, fontWeight: 700,
+              cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'linear-gradient(135deg, rgba(124,58,237,0.22), rgba(37,99,235,0.22))'}
+            onMouseLeave={e => e.currentTarget.style.background = 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(37,99,235,0.12))'}
+          >
+            🤖 {t('AI Tools — Scripts & Deal Memo', 'Herramientas IA — Scripts y Memo')}
+          </button>
+          {/* 💾 Save to Deal Bank */}
+          <button
+            onClick={handleSave}
+            title={savedState ? t('Remove from Deal Bank', 'Quitar del Banco') : t('Save to Deal Bank', 'Guardar en Banco')}
+            style={{
+              padding: '9px 13px', borderRadius: 8, cursor: 'pointer',
+              background: savedState ? 'rgba(34,197,94,0.12)' : 'var(--dr-surface-deep)',
+              border: savedState ? '1px solid rgba(34,197,94,0.4)' : '1px solid var(--dr-border)',
+              color: savedState ? '#4ade80' : 'var(--dr-text-faint)',
+              fontSize: 14, fontFamily: 'Inter, sans-serif', transition: 'all 0.2s',
+              display: 'flex', alignItems: 'center', gap: 5,
+            }}
+            onMouseEnter={e => !savedState && (e.currentTarget.style.borderColor = 'rgba(34,197,94,0.35)')}
+            onMouseLeave={e => !savedState && (e.currentTarget.style.borderColor = 'var(--dr-border)')}
+          >
+            {savedState ? '✅' : '💾'}
+          </button>
+        </div>
 
         {/* Listing agent contact (MLS live data) */}
         {listed && isLive && (opp.agentName || opp.agentPhone || opp.officeName) && (

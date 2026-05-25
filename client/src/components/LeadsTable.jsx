@@ -2,6 +2,12 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import AIToolsModal from './AIToolsModal'
 import OpportunityCard from './OpportunityCard'
+import { isSaved, saveDeal, unsaveDeal, oppToSaveEntry } from '../utils/savedDeals'
+
+function buildLeadSaveId(lead) {
+  const addr = (lead.fullAddress || lead.distressType || 'unknown').replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 60)
+  return `autopilot-${addr}`
+}
 
 const fmt = n => n != null ? `$${Number(n).toLocaleString()}` : '—'
 
@@ -420,12 +426,12 @@ export default function LeadsTable({ API, t, totalLeadsInState }) {
                               </div>
                             )}
 
-                            {/* AI Tools launch button */}
-                            <div style={{ gridColumn: '1 / -1' }}>
+                            {/* AI Tools + Save buttons */}
+                            <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 10 }}>
                               <button
                                 onClick={() => setAiToolsLead(lead)}
                                 style={{
-                                  width: '100%', padding: '10px 16px', borderRadius: 10,
+                                  flex: 1, padding: '10px 16px', borderRadius: 10,
                                   background: 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(37,99,235,0.12))',
                                   border: '1px solid rgba(124,58,237,0.3)',
                                   color: '#a78bfa', fontSize: 12, fontWeight: 700,
@@ -435,6 +441,7 @@ export default function LeadsTable({ API, t, totalLeadsInState }) {
                               >
                                 🤖 {t('Open AI Tools — Outreach Scripts & Deal Memo', 'Abrir Herramientas IA — Scripts y Memo')}
                               </button>
+                              <SaveLeadBtn lead={lead} t={t} />
                             </div>
                           </div>
                         </td>
@@ -483,6 +490,42 @@ export default function LeadsTable({ API, t, totalLeadsInState }) {
         />
       )}
     </div>
+  )
+}
+
+// ── Save-to-Deal-Bank button for a single lead ────────────────────────────────
+function SaveLeadBtn({ lead, t }) {
+  const saveId = buildLeadSaveId(lead)
+  const [savedState, setSavedState] = useState(() => isSaved(saveId))
+
+  function handleSave() {
+    const opp = leadToOpp(lead)
+    if (savedState) {
+      unsaveDeal(saveId)
+      setSavedState(false)
+    } else {
+      const entry = { ...oppToSaveEntry(opp, 'autopilot'), id: saveId }
+      saveDeal(entry)
+      setSavedState(true)
+    }
+  }
+
+  return (
+    <button
+      onClick={handleSave}
+      title={savedState ? t('Remove from Deal Bank', 'Quitar del Banco') : t('Save to Deal Bank', 'Guardar en Banco')}
+      style={{
+        padding: '10px 16px', borderRadius: 10, cursor: 'pointer',
+        background: savedState ? 'rgba(34,197,94,0.12)' : 'var(--dr-surface-deep)',
+        border: savedState ? '1px solid rgba(34,197,94,0.4)' : '1px solid var(--dr-border)',
+        color: savedState ? '#4ade80' : 'var(--dr-text-muted)',
+        fontSize: 13, fontWeight: 700, fontFamily: 'Inter, sans-serif',
+        display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
+        transition: 'all 0.2s',
+      }}
+    >
+      {savedState ? '✅' : '💾'} {savedState ? t('Saved', 'Guardado') : t('Save Deal', 'Guardar')}
+    </button>
   )
 }
 

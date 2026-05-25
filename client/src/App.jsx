@@ -10,6 +10,7 @@ import SettingsPage from './components/SettingsPage'
 import ProfilePage from './components/ProfilePage'
 import FinderSettings, { useFinderSettings, filterOpportunities } from './components/FinderSettings'
 import DealAnalyzer from './components/DealAnalyzer'
+import SavedDeals from './components/SavedDeals'
 
 const API = import.meta.env.VITE_API_URL || ''
 
@@ -283,6 +284,24 @@ export default function App() {
               style={{ width: '100%', minWidth: 0, padding: '28px 32px 48px', boxSizing: 'border-box' }}
             >
               <ProfilePage t={t} />
+            </motion.div>
+          )}
+
+          {/* ── Deal Bank ──────────────────────────────────────── */}
+          {activePage === 'saved' && (
+            <motion.div
+              key="saved"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              style={{ width: '100%', minWidth: 0, padding: '28px 32px 48px', boxSizing: 'border-box' }}
+            >
+              <PageTitle
+                icon="💾"
+                title={t('Deal Bank', 'Banco de Tratos')}
+                sub={t('Your saved deals from all tools — search, filter, and add notes', 'Tus tratos guardados de todas las herramientas — busca, filtra y agrega notas')}
+              />
+              <SavedDeals t={t} API={API} />
             </motion.div>
           )}
 
