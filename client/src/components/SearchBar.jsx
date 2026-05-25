@@ -7,10 +7,15 @@ export default function SearchBar({ onSearch, loading, t }) {
   const [suggestions, setSuggestions] = useState([])
   const [showDrop,    setShowDrop]    = useState(false)
   const [highlighted, setHighlighted] = useState(-1)
-  const inputRef  = useRef(null)
-  const dropRef   = useRef(null)
+  const inputRef       = useRef(null)
+  const dropRef        = useRef(null)
+  const justSelected   = useRef(false)   // prevents re-open after a selection
 
   useEffect(() => {
+    if (justSelected.current) {
+      justSelected.current = false
+      return
+    }
     const list = getSuggestions(value)
     setSuggestions(list)
     setShowDrop(list.length > 0 && value.length >= 2)
@@ -28,6 +33,7 @@ export default function SearchBar({ onSearch, loading, t }) {
   }, [])
 
   function handleSelect(loc) {
+    justSelected.current = true   // block the value-change effect from re-opening
     setValue(loc)
     setShowDrop(false)
     onSearch(loc)
