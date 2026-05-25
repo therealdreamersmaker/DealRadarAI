@@ -8,6 +8,7 @@ import AutopilotPanel from './components/AutopilotPanel'
 import LandingHero from './components/LandingHero'
 import SettingsPage from './components/SettingsPage'
 import ProfilePage from './components/ProfilePage'
+import FinderSettings, { useFinderSettings, filterOpportunities } from './components/FinderSettings'
 
 const API = import.meta.env.VITE_API_URL || ''
 
@@ -20,6 +21,8 @@ export default function App() {
   const [location,     setLocation]     = useState('')
   const [scanLoading,  setScanLoading]  = useState(false)
   const [finderTab,    setFinderTab]    = useState('results') // 'results' | 'copilot'
+
+  const { settings: finderSettings, toggleCategory, enableAll, disableAll } = useFinderSettings()
 
   const t = (en, es) => language === 'es' ? es : en
 
@@ -108,27 +111,51 @@ export default function App() {
 
               {(dashboardData || loading) && (
                 <>
-                  {/* Sub-tabs */}
-                  <div className="no-print" style={{ display: 'flex', gap: 2, marginBottom: 24, background: 'var(--dr-surface)', border: '1px solid var(--dr-border)', borderRadius: 10, padding: 4, width: 'fit-content' }}>
-                    {[
-                      { id: 'results', label: t('Market Results', 'Resultados') },
-                      { id: 'copilot', label: t('AI Copilot', 'Copiloto IA') },
-                    ].map(tab => (
-                      <button key={tab.id} onClick={() => setFinderTab(tab.id)} style={{
-                        padding: '7px 18px', borderRadius: 7, border: 'none',
-                        background: finderTab === tab.id ? '#2563eb' : 'transparent',
-                        color: finderTab === tab.id ? 'white' : 'var(--dr-text-faint)',
-                        fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                        fontFamily: 'Inter, sans-serif', transition: 'all 0.18s',
-                      }}>{tab.label}</button>
-                    ))}
+                  {/* Settings + Sub-tabs row */}
+                  <div className="no-print" style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
+                    {/* Sub-tabs */}
+                    <div style={{ display: 'flex', gap: 2, background: 'var(--dr-surface)', border: '1px solid var(--dr-border)', borderRadius: 10, padding: 4, width: 'fit-content' }}>
+                      {[
+                        { id: 'results', label: t('Market Results', 'Resultados') },
+                        { id: 'copilot', label: t('AI Copilot', 'Copiloto IA') },
+                      ].map(tab => (
+                        <button key={tab.id} onClick={() => setFinderTab(tab.id)} style={{
+                          padding: '7px 18px', borderRadius: 7, border: 'none',
+                          background: finderTab === tab.id ? '#2563eb' : 'transparent',
+                          color: finderTab === tab.id ? 'white' : 'var(--dr-text-faint)',
+                          fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                          fontFamily: 'Inter, sans-serif', transition: 'all 0.18s',
+                        }}>{tab.label}</button>
+                      ))}
+                    </div>
                   </div>
+
+                  {/* Finder settings panel (only on results tab) */}
+                  {finderTab === 'results' && (
+                    <div className="no-print">
+                      <FinderSettings
+                        settings={finderSettings}
+                        toggleCategory={toggleCategory}
+                        enableAll={enableAll}
+                        disableAll={disableAll}
+                        t={t}
+                      />
+                    </div>
+                  )}
 
                   <AnimatePresence mode="wait">
                     {finderTab === 'results' && (
                       <motion.div key="results" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ width: '100%' }}>
                         <Dashboard
-                          data={dashboardData}
+                          data={dashboardData
+                            ? {
+                                ...dashboardData,
+                                opportunities: filterOpportunities(
+                                  dashboardData.opportunities,
+                                  finderSettings.enabledCategories
+                                ),
+                              }
+                            : dashboardData}
                           loading={loading}
                           onScanMore={handleScanMore}
                           scanLoading={scanLoading}
