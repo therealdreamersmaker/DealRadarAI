@@ -345,6 +345,34 @@ export default function Dashboard({ data, loading, onScanMore, scanLoading, lang
         <StatCard label={t('Inventory', 'Inventario')} value={metrics?.inventoryDirection ?? '—'} icon="📦" color="#10b981" />
       </div>
 
+      {/* $/sqft market comparison */}
+      {data.ppsftComparison && (() => {
+        const p = data.ppsftComparison
+        const max = Math.max(p.zipAvg, p.cityAvg, p.stateAvg, p.national) * 1.15
+        const bar = (label, val, highlight) => (
+          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12 }}>
+            <span style={{ width: 110, color: 'var(--dr-text-faint)', flexShrink: 0, fontSize: 11 }}>{label}</span>
+            <div style={{ flex: 1, height: 7, background: 'var(--dr-border)', borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{ width: `${Math.min((val/max)*100,100)}%`, height: '100%', background: highlight ? '#3b82f6' : 'rgba(96,165,250,0.35)', borderRadius: 4 }} />
+            </div>
+            <span style={{ width: 60, textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontWeight: highlight ? 800 : 600, color: highlight ? '#60a5fa' : 'var(--dr-text-muted)', fontSize: 12 }}>${Number(val).toLocaleString()}</span>
+          </div>
+        )
+        return (
+          <div className="print-card" style={{ background: 'var(--dr-surface)', border: '1px solid rgba(124,58,237,0.25)', borderRadius: 16, padding: '18px 22px', marginBottom: 20 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--dr-text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 14 }}>
+              📐 {t('Price Per Sqft — Market Comparison', 'Precio Por Pie² — Comparación de Mercado')}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {bar(p.zipLabel   || 'ZIP Average', p.zipAvg,   true)}
+              {bar(p.cityLabel  || 'City Avg',    p.cityAvg,  false)}
+              {bar(p.stateLabel || 'State Avg',   p.stateAvg, false)}
+              {bar('National',                    p.national, false)}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Trend Charts */}
       {trendData.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>

@@ -4,6 +4,7 @@ import { useTheme } from '../ThemeContext'
 const NAV_MAIN = [
   { id: 'dashboard',  icon: '📊', label: 'Dashboard',        labelEs: 'Panel Principal' },
   { id: 'finder',     icon: '🔍', label: 'Deal Finder',       labelEs: 'Buscador de Tratos' },
+  { id: 'analyzer',   icon: '🔬', label: 'Deal Analyzer',     labelEs: 'Analizador de Tratos' },
   { id: 'autopilot',  icon: '⚡', label: 'Autopilot Hunter',  labelEs: 'Cazador Autopiloto' },
 ]
 const NAV_BOTTOM = [

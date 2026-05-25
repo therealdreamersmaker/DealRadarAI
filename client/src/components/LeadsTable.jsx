@@ -312,6 +312,7 @@ export default function LeadsTable({ API, t, totalLeadsInState }) {
                       <td style={{ padding: '10px 12px', color: 'var(--dr-text-3)', whiteSpace: 'nowrap', fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>
                         {lead.beds ?? '—'}bd / {lead.baths ?? '—'}ba
                         {lead.sqft ? <span style={{ color: 'var(--dr-text-faintest)', marginLeft: 4 }}>{Number(lead.sqft).toLocaleString()}sf</span> : null}
+                        {(lead.sqft && lead.targetOffer) ? <span style={{ color: '#a78bfa', marginLeft: 4 }}>${Math.round(lead.targetOffer / lead.sqft)}/sf</span> : null}
                       </td>
                       <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
                         <span style={{ color: 'var(--dr-text-muted)' }}>{lead.ownerFirstName} {lead.ownerLastName}</span>

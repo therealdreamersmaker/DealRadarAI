@@ -11,6 +11,7 @@ const { generateChat } = require('./llmService');
 const { runAutopilot, getState, getLeads, EXPORTS_DIR } = require('./autopilot');
 const { hasRentcast } = require('./listingsService');
 const { generateScripts, generateMemo } = require('./aiTools');
+const { analyzeProperty } = require('./propertyAnalyzer');
 
 const app = express();
 app.use(cors());
@@ -105,6 +106,20 @@ app.post('/api/ai-tools/memo', async (req, res) => {
   } catch (err) {
     console.error('[/api/ai-tools/memo]', err.message);
     res.status(500).json({ error: err.message || 'Memo generation failed' });
+  }
+});
+
+// ── Deal Analyzer — analyze a specific property by URL or address ─────────────
+app.post('/api/analyze-property', async (req, res) => {
+  const { input, language = 'en' } = req.body;
+  if (!input || !input.trim()) return res.status(400).json({ error: 'input (URL or address) is required' });
+  try {
+    console.log(`[/api/analyze-property] input: ${input.trim().slice(0, 80)}`);
+    const result = await analyzeProperty(input, language);
+    res.json(result);
+  } catch (err) {
+    console.error('[/api/analyze-property]', err.message);
+    res.status(500).json({ error: err.message || 'Property analysis failed' });
   }
 });
 

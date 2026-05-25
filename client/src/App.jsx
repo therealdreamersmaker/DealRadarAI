@@ -9,6 +9,7 @@ import LandingHero from './components/LandingHero'
 import SettingsPage from './components/SettingsPage'
 import ProfilePage from './components/ProfilePage'
 import FinderSettings, { useFinderSettings, filterOpportunities } from './components/FinderSettings'
+import DealAnalyzer from './components/DealAnalyzer'
 
 const API = import.meta.env.VITE_API_URL || ''
 
@@ -173,6 +174,24 @@ export default function App() {
                   </AnimatePresence>
                 </>
               )}
+            </motion.div>
+          )}
+
+          {/* ── Deal Analyzer ──────────────────────────────────── */}
+          {activePage === 'analyzer' && (
+            <motion.div
+              key="analyzer"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              style={{ width: '100%', minWidth: 0, padding: '28px 32px 48px', boxSizing: 'border-box' }}
+            >
+              <PageTitle
+                icon="🔬"
+                title={t('Deal Analyzer', 'Analizador de Tratos')}
+                sub={t('Paste a Zillow / Redfin URL or any address for a full AI wholesale analysis', 'Pega un link de Zillow/Redfin o cualquier dirección para un análisis completo de mayoreo')}
+              />
+              <DealAnalyzer API={API} t={t} language={language} />
             </motion.div>
           )}
 

@@ -245,12 +245,18 @@ export default function OpportunityCard({ opp, index, t, API = '' }) {
         </div>
 
         {/* Sub-details */}
-        <div style={{ fontSize: 11, color: '#c8d3e6', marginBottom: 14, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          {opp.bedBath    && <span>🛏 {opp.bedBath}</span>}
-          {opp.sqft       && <span>📐 {Number(opp.sqft).toLocaleString()} sqft</span>}
-          {opp.yearBuilt  && <span>🏗 {opp.yearBuilt}</span>}
-          {opp.daysOnMarket > 0 && <span>📅 {opp.daysOnMarket} {t('days', 'días')}</span>}
-        </div>
+        {(() => {
+          const ppsf = opp.sqft && opp.listPrice ? Math.round(opp.listPrice / opp.sqft) : null
+          return (
+            <div style={{ fontSize: 11, color: '#c8d3e6', marginBottom: 14, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              {opp.bedBath    && <span>🛏 {opp.bedBath}</span>}
+              {opp.sqft       && <span>📐 {Number(opp.sqft).toLocaleString()} sqft</span>}
+              {opp.yearBuilt  && <span>🏗 {opp.yearBuilt}</span>}
+              {opp.daysOnMarket > 0 && <span>📅 {opp.daysOnMarket} {t('days', 'días')}</span>}
+              {ppsf !== null  && <span style={{ color: '#a78bfa', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700 }}>📐 ${ppsf.toLocaleString()}/sqft</span>}
+            </div>
+          )
+        })()}
 
         {/* Financial grid */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>

@@ -33,6 +33,15 @@ Schema:
   "trends": [
     { "month": "string", "medianPrice": number, "daysOnMarket": number }
   ],
+  "ppsftComparison": {
+    "zipAvg":   number,
+    "cityAvg":  number,
+    "stateAvg": number,
+    "national": number,
+    "zipLabel":   "string",
+    "cityLabel":  "string",
+    "stateLabel": "string"
+  },
   "macroComparison": {
     "national": {
       "label": "National",
