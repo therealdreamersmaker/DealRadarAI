@@ -3,6 +3,7 @@ const { createObjectCsvWriter } = require('csv-writer');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
+const { generateText } = require('./llmService');
 
 const LOGS_DIR = path.join(__dirname, '../../logs');
 if (!fs.existsSync(LOGS_DIR)) fs.mkdirSync(LOGS_DIR, { recursive: true });
@@ -90,91 +91,182 @@ async function step1_selectTopZipCodes(configuredMarkets = []) {
 
 const DEFAULT_DISTRESS_TYPES = ['Foreclosure', 'Tax Delinquency', 'Inherited House'];
 
+function buildAutopilotPropertyPrompt(market, zip, distressTypes) {
+  return `You are a real estate data specialist with deep knowledge of US neighborhoods and distressed property markets.
+
+Generate 10 realistic distressed property profiles for "${market}" (ZIP area ${zip}) for MVP demonstration purposes.
+
+Return ONLY a raw JSON array of exactly 10 objects — no markdown, no code fences, no commentary:
+[
+  {
+    "address": "realistic street address in ${market} — use real local street names and neighborhoods (e.g. '2847 Cascade Rd SW, Atlanta, GA 30311')",
+    "distressType": "one of: ${distressTypes.join(' | ')}",
+    "arv": number (realistic after-repair value for ${market} housing market),
+    "targetOffer": number (65-70% of ARV),
+    "equity": number (30-70, as a whole-number percent),
+    "dom": number (45-120, days the property has been distressed/listed),
+    "beds": number (2, 3, 4, or 5),
+    "baths": number (1, 1.5, 2, 2.5, or 3),
+    "sqft": number (900-2800),
+    "yearBuilt": number (1945-2005),
+    "note": "1-2 sentences describing the owner situation and why it is a strong wholesale opportunity"
+  }
+]
+
+Rules:
+- Spread distressType across ALL provided types: ${distressTypes.join(', ')}
+- Use actual neighborhood names and realistic street patterns for ${market}
+- ARV must reflect real ${market} housing prices (research your training data)
+- targetOffer = 65-70% of ARV (round to nearest $1,000)
+- Do NOT use generic street names like "Oak Ave" or "Maple St" — use streets real to ${market}
+- Return ONLY the JSON array with no surrounding text.`;
+}
+
+function buildFallbackProperties(zipInfo, distressTypes, count) {
+  // Fallback when AI call fails — honest about being a fallback
+  const props = [];
+  for (let i = 0; i < count; i++) {
+    const distress = distressTypes[i % distressTypes.length];
+    const arv = 130000 + Math.floor(Math.random() * 220000);
+    props.push({
+      id: uuidv4(),
+      address: `${1000 + Math.floor(Math.random() * 8000)} Main St`,
+      city: zipInfo.city.split(',')[0],
+      state: zipInfo.city.split(', ')[1],
+      zip: zipInfo.zip,
+      distressType: distress,
+      arv,
+      targetOffer: Math.round(arv * 0.68),
+      equity: 30 + Math.floor(Math.random() * 35),
+      dom: zipInfo.dom + Math.floor(Math.random() * 20) - 10,
+      beds: [2, 3, 3, 4][i % 4],
+      baths: [1, 2, 2, 3][i % 4],
+      sqft: 950 + Math.floor(Math.random() * 1200),
+      yearBuilt: 1952 + Math.floor(Math.random() * 53),
+      note: `AI-estimated ${distress} property in ${zipInfo.city}.`,
+      dataSource: 'ai-estimate',
+    });
+  }
+  return props;
+}
+
 async function step2_extractDistressedProperties(zipCodes, selectedNiches = []) {
-  addLog('Step 2: Extracting distressed properties via list-stacking criteria...');
+  addLog('Step 2: Generating AI-estimated distressed property profiles...');
   const distressTypes = selectedNiches.length > 0 ? selectedNiches : DEFAULT_DISTRESS_TYPES;
-  addLog(`Using distress categories: ${distressTypes.join(', ')}`);
+  addLog(`Distress categories in scope: ${distressTypes.join(', ')}`);
   const properties = [];
 
   for (const zipInfo of zipCodes) {
-    const batchSize = Math.ceil(100 / zipCodes.length);
-    addLog(`Querying ${batchSize} properties for zip ${zipInfo.zip} (${zipInfo.city})`);
+    const market = zipInfo.city;
+    addLog(`Calling AI to generate 10 property profiles for ${market} (${zipInfo.zip})...`);
 
-    for (let i = 0; i < batchSize; i++) {
-      const streetNum = 1000 + Math.floor(Math.random() * 8000);
-      const streets = ['Oak Ave', 'Maple St', 'Pine Rd', 'Cedar Blvd', 'Elm Dr', 'Birch Ln', 'Peach Tree St', 'Magnolia Way', 'Sunset Blvd', 'River Rd'];
-      const street = streets[Math.floor(Math.random() * streets.length)];
-      const distress = distressTypes[Math.floor(Math.random() * distressTypes.length)];
-      const arv = 120000 + Math.floor(Math.random() * 280000);
-      const targetOffer = Math.round(arv * 0.70);
+    try {
+      const prompt = buildAutopilotPropertyPrompt(market, zipInfo.zip, distressTypes);
+      const raw     = await generateText(prompt);
+      const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const start   = cleaned.indexOf('[');
+      const end     = cleaned.lastIndexOf(']');
+      if (start === -1 || end === -1) throw new Error('No JSON array in AI response');
+      const parsed = JSON.parse(cleaned.slice(start, end + 1));
 
-      properties.push({
-        id: uuidv4(),
-        address: `${streetNum} ${street}`,
-        city: zipInfo.city.split(',')[0],
-        state: zipInfo.city.split(', ')[1],
-        zip: zipInfo.zip,
-        distressType: distress,
-        arv,
-        targetOffer,
-        equity: 30 + Math.floor(Math.random() * 40),
-        dom: zipInfo.dom + Math.floor(Math.random() * 20) - 10,
-      });
+      for (const p of parsed) {
+        properties.push({
+          id:          uuidv4(),
+          address:     p.address     || `${Math.floor(Math.random() * 8000) + 1000} Main St`,
+          city:        market.split(',')[0],
+          state:       market.split(', ')[1] || '',
+          zip:         zipInfo.zip,
+          distressType: p.distressType || distressTypes[0],
+          arv:         Number(p.arv)         || 180000,
+          targetOffer: Number(p.targetOffer) || 126000,
+          equity:      Number(p.equity)      || 35,
+          dom:         Number(p.dom)         || zipInfo.dom,
+          beds:        Number(p.beds)        || 3,
+          baths:       Number(p.baths)       || 2,
+          sqft:        Number(p.sqft)        || 1400,
+          yearBuilt:   Number(p.yearBuilt)   || 1975,
+          note:        p.note || '',
+          dataSource:  'ai-estimate',
+        });
+      }
+      addLog(`✓ Generated ${parsed.length} AI property profiles for ${market}`);
+    } catch (err) {
+      addLog(`AI generation failed for ${market}: ${err.message} — using numeric fallback`, 'warn');
+      properties.push(...buildFallbackProperties(zipInfo, distressTypes, 10));
     }
 
-    await rateLimitedRequest(() => {}, 300);
+    await rateLimitedRequest(() => {}, 500);
   }
 
-  addLog(`Extracted ${properties.length} distressed properties across ${zipCodes.length} markets`);
+  addLog(`Total: ${properties.length} AI-estimated properties across ${zipCodes.length} market(s)`);
   return properties.slice(0, 100);
 }
 
+// State → area code lookup for more realistic demo phone numbers
+const STATE_AREA_CODES = {
+  GA: ['404','678','770','912'], TX: ['214','713','469','832','281','512','210'],
+  AL: ['205','251','334'],       SC: ['803','864','843'],   LA: ['504','225','318'],
+  FL: ['305','786','954','407','813','904','850'], AZ: ['602','480','623','928'],
+  NV: ['702','725'],             CA: ['213','323','310','818','619','858','916'],
+  IL: ['312','773','847','630'], NY: ['212','718','646','347','917'],
+  NC: ['704','980','919','336'], OH: ['216','614','513'],   MI: ['313','734','248'],
+  TN: ['615','901','423'],       VA: ['703','571','804'],   MD: ['410','443','301'],
+};
+
+function getAreaCode(state) {
+  const codes = STATE_AREA_CODES[state] || ['555'];
+  return codes[Math.floor(Math.random() * codes.length)];
+}
+
 async function step3_skipTrace(properties) {
-  addLog('Step 3: Running skip-tracing for owner contact enrichment...');
+  addLog('Step 3: Attaching demo contact data (⚠ DEMO — not real owner contacts)...');
+  addLog('To unlock real owner contacts, connect a skip-trace API (BatchSkipTracing, REISkip, etc.)', 'warn');
   const enriched = [];
   let discarded = 0;
   let idx = 0;
 
+  const firstNames = ['James','Michael','Robert','David','William','Maria','Linda','Patricia','Barbara',
+                      'Susan','Charles','Joseph','Thomas','Jessica','Sarah','Kevin','Angela','Marcus',
+                      'Diane','Richard','Dorothy','Kenneth','Michelle','Anthony','Sandra'];
+  const lastNames  = ['Johnson','Williams','Brown','Davis','Miller','Wilson','Moore','Taylor','Anderson',
+                      'Thomas','Jackson','White','Harris','Martin','Garcia','Martinez','Robinson',
+                      'Clark','Rodriguez','Lewis','Lee','Walker','Hall','Allen','Young'];
+
   while (enriched.length < 100 && idx < properties.length) {
     const prop = properties[idx++];
+    await rateLimitedRequest(() => {}, 80);
 
-    await rateLimitedRequest(() => {}, 100);
-
-    const firstNames = ['James', 'Michael', 'Robert', 'David', 'William', 'Maria', 'Linda', 'Patricia', 'Barbara', 'Susan', 'Charles', 'Joseph', 'Thomas', 'Jessica', 'Sarah'];
-    const lastNames  = ['Johnson', 'Williams', 'Brown', 'Davis', 'Miller', 'Wilson', 'Moore', 'Taylor', 'Anderson', 'Thomas', 'Jackson', 'White', 'Harris', 'Martin', 'Garcia'];
-
-    const hasPhone = Math.random() > 0.15;
-    const hasEmail = Math.random() > 0.2;
-
-    if (!hasPhone || !hasEmail) {
+    // Simulate realistic hit/miss rates (demo)
+    if (Math.random() < 0.12) {
       discarded++;
-      addLog(`Discarded record for ${prop.address} — incomplete contact data. Pulling next...`, 'warn');
+      addLog(`[DEMO] No contact match for ${prop.address} — skipping`, 'warn');
       continue;
     }
 
-    const firstName  = firstNames[Math.floor(Math.random() * firstNames.length)];
-    const lastName   = lastNames[Math.floor(Math.random() * lastNames.length)];
-    const areaCodes  = ['404', '713', '205', '843', '225', '312', '305', '214', '602', '702'];
-    const areaCode   = areaCodes[Math.floor(Math.random() * areaCodes.length)];
-    const phoneNum   = `${Math.floor(Math.random() * 900) + 100}${Math.floor(Math.random() * 9000) + 1000}`;
-    const isMLS      = Math.random() > 0.5;
-    const agentFirst = ['Sarah', 'John', 'Emily', 'Chris', 'Amanda', 'Marcus', 'Diane'];
-    const agentLast  = ['Parker', 'Smith', 'Chen', 'Williams', 'Jones', 'Rivera', 'Scott'];
+    const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+    const lastName  = lastNames[Math.floor(Math.random() * lastNames.length)];
+    const areaCode  = getAreaCode(prop.state);
+    const phoneNum  = `${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 9000) + 1000}`;
+    const domains   = ['gmail.com','yahoo.com','outlook.com','icloud.com','hotmail.com'];
+    const isMLS     = Math.random() > 0.55;
+    const agentFirst = ['Sarah','John','Emily','Chris','Amanda','Marcus','Diane','Rachel','Brian'];
+    const agentLast  = ['Parker','Smith','Chen','Williams','Jones','Rivera','Scott','Nguyen','Torres'];
 
     enriched.push({
       ...prop,
       ownerFirstName: firstName,
       ownerLastName:  lastName,
-      phone: `+1${areaCode}${phoneNum}`,
-      email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@${['gmail', 'yahoo', 'outlook'][Math.floor(Math.random() * 3)]}.com`,
+      phone:     `+1 (${areaCode}) ${phoneNum}`,
+      email:     `${firstName.toLowerCase()}.${lastName.toLowerCase()}@${domains[Math.floor(Math.random() * domains.length)]}`,
       agentName: isMLS
         ? `${agentFirst[Math.floor(Math.random() * agentFirst.length)]} ${agentLast[Math.floor(Math.random() * agentLast.length)]}`
         : 'Off-Market',
       fullAddress: `${prop.address}, ${prop.city}, ${prop.state} ${prop.zip}`,
+      isDemo: true,   // ← flags this row as demo contact data in the UI
     });
   }
 
-  addLog(`Skip-tracing complete: ${enriched.length} clean records, ${discarded} discarded`);
+  addLog(`[DEMO] Contact attachment complete: ${enriched.length} records, ${discarded} no-match`);
   return enriched;
 }
 
@@ -186,26 +278,35 @@ async function step4_exportCSV(records) {
   const csvWriter = createObjectCsvWriter({
     path: filepath,
     header: [
-      { id: 'fullAddress',  title: 'Property Address' },
-      { id: 'distressType', title: 'Market Summary'   },
-      { id: 'ownerName',    title: 'Owner Name'        },
-      { id: 'phone',        title: 'Phone'             },
-      { id: 'email',        title: 'Email'             },
-      { id: 'agentName',    title: 'Agent Name'        },
-      { id: 'arv',          title: 'Estimated ARV'     },
-      { id: 'targetOffer',  title: 'Target Offer (70%)'  },
+      { id: 'fullAddress',  title: 'Property Address'     },
+      { id: 'distressType', title: 'Distress Category'    },
+      { id: 'beds',         title: 'Beds'                  },
+      { id: 'baths',        title: 'Baths'                 },
+      { id: 'sqft',         title: 'Sqft'                  },
+      { id: 'yearBuilt',    title: 'Year Built'            },
+      { id: 'arv',          title: 'Estimated ARV'         },
+      { id: 'targetOffer',  title: 'Target Offer'          },
+      { id: 'equity',       title: 'Equity %'              },
+      { id: 'dom',          title: 'DOM'                   },
+      { id: 'ownerName',    title: 'Owner Name (DEMO)'     },
+      { id: 'phone',        title: 'Phone (DEMO)'          },
+      { id: 'email',        title: 'Email (DEMO)'          },
+      { id: 'agentName',    title: 'Agent / Status'        },
+      { id: 'note',         title: 'AI Deal Note'          },
+      { id: 'dataSource',   title: 'Data Source'           },
     ],
   });
 
   const rows = records.map(r => ({
     ...r,
     ownerName:   `${r.ownerFirstName} ${r.ownerLastName}`,
-    arv:         `$${r.arv.toLocaleString()}`,
-    targetOffer: `$${r.targetOffer.toLocaleString()}`,
+    arv:         `$${Number(r.arv).toLocaleString()}`,
+    targetOffer: `$${Number(r.targetOffer).toLocaleString()}`,
+    equity:      `${r.equity}%`,
   }));
 
   await csvWriter.writeRecords(rows);
-  addLog(`CSV exported: ${filename}`);
+  addLog(`CSV exported: ${filename} (${records.length} rows)`);
   return { filepath, filename, downloadUrl: `/api/autopilot/download/${filename}` };
 }
 
