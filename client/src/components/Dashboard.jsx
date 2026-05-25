@@ -79,23 +79,157 @@ const DEAL_CATEGORIES = [
 
 // ── Export helpers ────────────────────────────────────────────────────────────
 function printSection(opps, title) {
+  const fmtP = n => n != null ? `$${Number(n).toLocaleString()}` : '—'
+
+  // Inline deal-score logic (mirrors OpportunityCard — no JSX here)
+  function getDealScore(opp) {
+    if (opp.dealScore) return Number(opp.dealScore)
+    let pts = 0
+    const dom = opp.daysOnMarket || 0
+    if (dom > 90) pts += 25; else if (dom > 60) pts += 18; else if (dom > 30) pts += 10; else if (dom > 14) pts += 5
+    const eq = opp.arv && opp.listPrice ? ((opp.arv - opp.listPrice) / opp.arv) * 100 : 0
+    if (eq >= 35) pts += 30; else if (eq >= 25) pts += 22; else if (eq >= 15) pts += 14; else if (eq >= 5) pts += 7
+    if (opp.yearBuilt) { if (opp.yearBuilt < 1960) pts += 20; else if (opp.yearBuilt < 1975) pts += 14; else if (opp.yearBuilt < 1990) pts += 8 }
+    const ppsf = opp.sqft && opp.listPrice ? opp.listPrice / opp.sqft : null
+    if (ppsf !== null) { if (ppsf < 55) pts += 15; else if (ppsf < 80) pts += 10; else if (ppsf < 110) pts += 5 }
+    const HIGH = ['Foreclosure','Tax Delinquency','Fire Damage','Bank Owned','Price Drop']
+    const MED  = ['Property Issues','Inherited House','Too Many Liens','Fixer-Upper']
+    if (HIGH.some(t => opp.type?.includes(t))) pts += 10; else if (MED.some(t => opp.type?.includes(t))) pts += 6; else pts += 3
+    return Math.max(1, Math.min(10, Math.round(pts / 10)))
+  }
+  function getScoreStyle(s) {
+    if (s >= 9) return { label:'HOT DEAL', color:'#15803d', bg:'#dcfce7', border:'#86efac' }
+    if (s >= 7) return { label:'STRONG',   color:'#b45309', bg:'#fef3c7', border:'#fcd34d' }
+    if (s >= 5) return { label:'SOLID',    color:'#1d4ed8', bg:'#dbeafe', border:'#93c5fd' }
+    if (s >= 3) return { label:'AVERAGE',  color:'#c2410c', bg:'#ffedd5', border:'#fdba74' }
+    return              { label:'PASS',    color:'#b91c1c', bg:'#fee2e2', border:'#fca5a5' }
+  }
+  function getTypeColor(type) {
+    const M = {'Foreclosure':'#dc2626','Tax Delinquency':'#ea580c','Property Issues':'#7c3aed','Inherited House':'#475569','Relocations':'#059669','Fire Damage':'#ea580c','Bank Owned':'#2563eb','Too Many Liens':'#7c3aed','No/Low Equity':'#ca8a04','Price Drop':'#dc2626','Fixer-Upper':'#ea580c','Extended DOM':'#2563eb'}
+    return M[type] || '#2563eb'
+  }
+  function getInsight(opp) {
+    const b = []
+    const dom = opp.daysOnMarket || 0
+    if (dom > 90) b.push(`🔥 ${dom} days on market — seller is highly motivated, deep discount likely`)
+    else if (dom > 45) b.push(`⏳ ${dom} days on market — above-average DOM, price reduction incoming`)
+    else if (dom > 20) b.push(`📅 ${dom} days on market — mild motivation, worth opening a conversation`)
+    if (opp.yearBuilt && opp.yearBuilt < 1970) b.push(`🏚 Built ${opp.yearBuilt} — likely needs full rehab (roof, plumbing, electrical)`)
+    else if (opp.yearBuilt && opp.yearBuilt < 1985) b.push(`🔨 Built ${opp.yearBuilt} — cosmetic + mechanical updates probable`)
+    const ppsf = opp.sqft && opp.listPrice ? Math.round(opp.listPrice / opp.sqft) : null
+    if (ppsf !== null && ppsf < 60) b.push(`💰 Only $${ppsf}/sqft — well below market; exceptional value-add opportunity`)
+    else if (ppsf !== null && ppsf < 100) b.push(`📊 $${ppsf}/sqft — below-market pricing creates meaningful profit room`)
+    const profit = opp.arv && opp.targetOffer ? opp.arv - opp.targetOffer : null
+    if (profit && profit >= 30000) b.push(`🚀 Est. $${Number(profit).toLocaleString()} wholesale profit at 70% ARV offer`)
+    else if (profit && profit >= 15000) b.push(`✅ Est. $${Number(profit).toLocaleString()} wholesale profit at 70% ARV offer`)
+    const eq = opp.arv && opp.listPrice ? Math.round(((opp.arv - opp.listPrice) / opp.arv) * 100) : null
+    if (eq && eq >= 25) b.push(`💎 ${eq}% spread between list price and ARV — strong equity play`)
+    if (opp.type === 'Price Drop') b.push('📉 Price has already been cut — seller motivation is confirmed')
+    if (b.length === 0) b.push('📋 Verify comps and run a full repair estimate before offering')
+    return b
+  }
+
+  const cards = opps.map(opp => {
+    const score   = getDealScore(opp)
+    const ss      = getScoreStyle(score)
+    const tc      = getTypeColor(opp.type)
+    const profit  = opp.arv && opp.targetOffer ? opp.arv - opp.targetOffer : null
+    const equity  = opp.arv && opp.listPrice ? Math.round(((opp.arv - opp.listPrice) / opp.arv) * 100) : null
+    const isLstd  = opp.isListed === true
+    const bullets = getInsight(opp)
+
+    const agentHtml = (opp.agentName || opp.agentPhone || opp.agentEmail || opp.officeName) ? `
+      <div class="sbox blue-box">
+        <div class="slabel" style="color:#1d4ed8">📞 LISTING AGENT</div>
+        ${opp.agentName  ? `<div class="row2"><span>Agent</span><span>${opp.agentName}</span></div>` : ''}
+        ${opp.agentPhone ? `<div class="row2"><span>Phone</span><a href="tel:${opp.agentPhone}" style="color:#2563eb">${opp.agentPhone}</a></div>` : ''}
+        ${opp.agentEmail ? `<div class="row2"><span>Email</span><a href="mailto:${opp.agentEmail}" style="color:#2563eb">${opp.agentEmail}</a></div>` : ''}
+        ${opp.officeName ? `<div class="row2"><span>Brokerage</span><span>${opp.officeName}</span></div>` : ''}
+      </div>` : ''
+
+    const countyHtml = (!isLstd && opp.countySearchUrl) ? `
+      <div class="sbox purple-box">
+        <div class="slabel" style="color:#6d28d9">🏛 RESEARCH LINK</div>
+        <p style="font-size:11px;color:#374151;margin:3px 0">${opp.countySearchLabel || 'County Records'}</p>
+        ${opp.countySearchTip ? `<p style="font-size:10px;color:#6b7280;margin:2px 0">💡 ${opp.countySearchTip}</p>` : ''}
+        <a href="${opp.countySearchUrl}" style="font-size:11px;color:#7c3aed;font-weight:700">🔗 Open County Records →</a>
+      </div>` : ''
+
+    const noteHtml = opp.note ? `
+      <div class="sbox purple-box">
+        <div class="slabel" style="color:#6d28d9">🤖 AI DEAL NOTE</div>
+        <p style="font-size:11px;color:#374151;line-height:1.5;margin:3px 0">${opp.note}</p>
+      </div>` : ''
+
+    const zillowHtml = opp.zillowUrl ? `
+      <a href="${opp.zillowUrl}" class="zillow-btn">🔵 View on Zillow →</a>` : ''
+
+    return `
+    <div class="card">
+      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px">
+        <span class="bdg" style="background:${tc}18;color:${tc};border:1px solid ${tc}44">${opp.type || 'Listing'}</span>
+        <span class="bdg" style="background:${ss.bg};color:${ss.color};border:1px solid ${ss.border}">⭐ ${score}/10 ${ss.label}</span>
+        <span class="bdg" style="background:${isLstd?'#dcfce7':'#fef9c3'};color:${isLstd?'#166534':'#854d0e'};border:1px solid ${isLstd?'#86efac':'#fde68a'}">${isLstd?'● MLS LISTED':'◆ OFF-MARKET'}</span>
+        ${opp.dataSource==='live'        ? '<span class="bdg" style="background:#d1fae5;color:#065f46;border:1px solid #6ee7b7">✓ LIVE DATA</span>' : ''}
+        ${opp.dataSource==='ai-estimate' ? '<span class="bdg" style="background:#ede9fe;color:#5b21b6;border:1px solid #c4b5fd">🤖 AI ESTIMATE</span>' : ''}
+      </div>
+      <div class="addr">${opp.address || 'Off-Market Lead — No specific address'}</div>
+      <div class="details">
+        ${opp.bedBath      ? `<span>🛏 ${opp.bedBath}</span>` : ''}
+        ${opp.sqft         ? `<span>📐 ${Number(opp.sqft).toLocaleString()} sqft</span>` : ''}
+        ${opp.yearBuilt    ? `<span>🏗 ${opp.yearBuilt}</span>` : ''}
+        ${opp.daysOnMarket ? `<span>📅 ${opp.daysOnMarket} days on market</span>` : ''}
+        ${opp.mlsNumber    ? `<span>📋 ${opp.mlsNumber}</span>` : ''}
+      </div>
+      <div class="fins">
+        <div class="fin"><div class="fin-l">List Price</div><div class="fin-v" style="color:#ea580c">${fmtP(opp.listPrice)}</div></div>
+        <div class="fin"><div class="fin-l">ARV</div><div class="fin-v" style="color:#2563eb">${fmtP(opp.arv)}</div></div>
+        <div class="fin"><div class="fin-l">Target Offer (70%)</div><div class="fin-v" style="color:#ea580c">${fmtP(opp.targetOffer)}</div></div>
+        <div class="fin"><div class="fin-l">Est. Profit</div><div class="fin-v" style="color:#15803d">${profit ? fmtP(profit) : '—'}</div></div>
+      </div>
+      ${equity !== null ? `<div class="eq-chip">📈 ${equity}% potential equity spread</div>` : ''}
+      <div class="ins-box">
+        <div class="ins-title">✦ DEAL INSIGHT</div>
+        ${bullets.map(b => `<div class="ins-b">${b}</div>`).join('')}
+      </div>
+      ${agentHtml}${countyHtml}${noteHtml}${zillowHtml}
+    </div>`
+  }).join('')
+
   const win = window.open('', '_blank')
-  const rows = opps.map(o => `
-    <tr>
-      <td>${o.type || ''}</td><td>${o.address || 'Off-Market'}</td>
-      <td>$${Number(o.listPrice || 0).toLocaleString()}</td>
-      <td>$${Number(o.arv || 0).toLocaleString()}</td>
-      <td>$${Number(o.targetOffer || 0).toLocaleString()}</td>
-      <td>${o.bedBath || ''}</td><td>${o.sqft || ''}</td>
-      <td>${o.yearBuilt || ''}</td><td>${o.note || ''}</td>
-    </tr>`).join('')
-  win.document.write(`<html><head><title>${title}</title>
-    <style>body{font-family:Arial,sans-serif;font-size:12px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}th{background:#f0f0f0}</style>
-    </head><body><h2>${title}</h2><table>
-    <tr><th>Type</th><th>Address</th><th>List Price</th><th>ARV</th><th>Target Offer</th><th>Bed/Bath</th><th>Sqft</th><th>Year Built</th><th>Notes</th></tr>
-    ${rows}</table></body></html>`)
+  win.document.write(`<!DOCTYPE html><html><head><title>${title}</title><meta charset="utf-8">
+  <style>
+    *{box-sizing:border-box}
+    body{font-family:-apple-system,Arial,sans-serif;background:#f8fafc;margin:0;padding:24px;color:#1e293b}
+    h1{font-size:22px;font-weight:800;margin-bottom:2px;color:#0f172a}
+    .sub{font-size:12px;color:#64748b;margin-bottom:20px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+    .card{background:white;border:1px solid #e2e8f0;border-radius:12px;padding:18px;page-break-inside:avoid}
+    .bdg{display:inline-flex;align-items:center;gap:3px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.04em}
+    .addr{font-size:15px;font-weight:700;color:#0f172a;margin-bottom:5px;line-height:1.4}
+    .details{font-size:11px;color:#64748b;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:10px}
+    .fins{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px}
+    .fin{background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px}
+    .fin-l{font-size:9px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:2px}
+    .fin-v{font-size:13px;font-weight:700;font-family:'Courier New',monospace}
+    .eq-chip{background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:5px 10px;margin-bottom:10px;font-size:11px;color:#15803d;font-weight:600}
+    .ins-box{background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 12px;margin-bottom:10px}
+    .ins-title{font-size:10px;font-weight:800;color:#15803d;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+    .ins-b{font-size:11px;color:#166534;line-height:1.5;margin:2px 0}
+    .sbox{border-radius:8px;padding:10px 12px;margin-bottom:10px}
+    .blue-box{background:#eff6ff;border:1px solid #bfdbfe}
+    .purple-box{background:#faf5ff;border:1px solid #ddd6fe}
+    .slabel{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px}
+    .row2{display:flex;justify-content:space-between;font-size:11px;padding:2px 0;color:#374151}
+    .zillow-btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;color:#2563eb;text-decoration:none;font-size:11px;font-weight:700;margin-top:6px}
+    @media print{body{background:white;padding:16px;-webkit-print-color-adjust:exact;print-color-adjust:exact}.grid{gap:12px}}
+  </style></head><body>
+  <h1>${title}</h1>
+  <div class="sub">DealRadar AI · ${new Date().toLocaleDateString()} · ${opps.length} result${opps.length === 1 ? '' : 's'}</div>
+  <div class="grid">${cards}</div>
+  <script>window.onload=()=>window.print();<\/script>
+  </body></html>`)
   win.document.close()
-  win.print()
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────

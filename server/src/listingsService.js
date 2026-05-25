@@ -133,6 +133,11 @@ function mapListingToOpportunity(listing) {
     dataSource: 'live',
     zillowUrl:  buildZillowUrl(address),
     redfinUrl:  buildRedfinUrl(address),
+    // Listing agent contact from RentCast
+    agentName:  listing.listAgentName  || null,
+    agentPhone: listing.listAgentPhone || null,
+    agentEmail: listing.listAgentEmail || null,
+    officeName: listing.listOfficeName || listing.listBrokerName || null,
   };
 }
 

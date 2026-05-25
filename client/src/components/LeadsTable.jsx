@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import AIToolsModal from './AIToolsModal'
+import OpportunityCard from './OpportunityCard'
 
 const fmt = n => n != null ? `$${Number(n).toLocaleString()}` : '—'
 
@@ -28,6 +29,67 @@ const ALL_FILTER_NICHES = [
   'Relocations', 'Fire Damage', 'Bank Owned', 'Too Many Liens', 'No/Low Equity',
 ]
 
+// Inline deal score (mirrors OpportunityCard formula)
+function calcScore(lead) {
+  if (lead.dealScore) return Number(lead.dealScore)
+  let pts = 0
+  const dom = lead.dom || 0
+  if (dom > 90) pts += 25; else if (dom > 60) pts += 18; else if (dom > 30) pts += 10; else if (dom > 14) pts += 5
+  // For off-market leads, equity is already stored as a % field
+  const eq = lead.equity || 0
+  if (eq >= 35) pts += 30; else if (eq >= 25) pts += 22; else if (eq >= 15) pts += 14; else if (eq >= 5) pts += 7
+  if (lead.yearBuilt) { if (lead.yearBuilt < 1960) pts += 20; else if (lead.yearBuilt < 1975) pts += 14; else if (lead.yearBuilt < 1990) pts += 8 }
+  const HIGH = ['Foreclosure','Tax Delinquency','Fire Damage','Bank Owned']
+  const MED  = ['Property Issues','Inherited House','Too Many Liens']
+  if (HIGH.some(t => lead.distressType?.includes(t))) pts += 10; else if (MED.some(t => lead.distressType?.includes(t))) pts += 6; else pts += 3
+  return Math.max(1, Math.min(10, Math.round(pts / 10)))
+}
+function scoreStyle(s) {
+  if (s >= 9) return { color:'#22c55e', bg:'rgba(34,197,94,0.12)',  border:'rgba(34,197,94,0.35)',  label:'HOT' }
+  if (s >= 7) return { color:'#fbbf24', bg:'rgba(251,191,36,0.12)', border:'rgba(251,191,36,0.35)', label:'STRONG' }
+  if (s >= 5) return { color:'#60a5fa', bg:'rgba(96,165,250,0.12)', border:'rgba(96,165,250,0.35)', label:'SOLID' }
+  if (s >= 3) return { color:'#f97316', bg:'rgba(249,115,22,0.12)', border:'rgba(249,115,22,0.35)', label:'AVG' }
+  return              { color:'#ef4444', bg:'rgba(239,68,68,0.12)',  border:'rgba(239,68,68,0.35)',  label:'PASS' }
+}
+// Map autopilot lead → opp format for OpportunityCard
+function leadToOpp(lead) {
+  return {
+    type:        lead.distressType,
+    address:     lead.fullAddress,
+    arv:         lead.arv,
+    targetOffer: lead.targetOffer,
+    listPrice:   lead.arv, // for off-market: ARV is the reference value
+    daysOnMarket:lead.dom || 0,
+    bedBath:     (lead.beds && lead.baths) ? `${lead.beds}bd/${lead.baths}ba` : null,
+    sqft:        lead.sqft,
+    yearBuilt:   lead.yearBuilt,
+    isListed:    false,
+    dataSource:  'ai-estimate',
+    dealScore:   lead.dealScore,
+    note:        lead.note,
+    isDemo:      lead.isDemo,
+    zillowUrl:   null,
+    redfinUrl:   null,
+  }
+}
+function generateInsight(lead) {
+  const b = []
+  const dom = lead.dom || 0
+  if (dom > 90) b.push(`🔥 ${dom} days — seller highly motivated, deep discount likely`)
+  else if (dom > 45) b.push(`⏳ ${dom} days on market — motivation building, offer now`)
+  else if (dom > 20) b.push(`📅 ${dom} days — mild motivation; open a conversation`)
+  if (lead.yearBuilt && lead.yearBuilt < 1970) b.push(`🏚 Built ${lead.yearBuilt} — likely needs full rehab`)
+  else if (lead.yearBuilt && lead.yearBuilt < 1985) b.push(`🔨 Built ${lead.yearBuilt} — cosmetic + mechanical updates probable`)
+  const profit = lead.arv && lead.targetOffer ? lead.arv - lead.targetOffer : null
+  if (profit && profit >= 30000) b.push(`🚀 Est. ${fmt(profit)} wholesale profit at 70% ARV`)
+  else if (profit && profit >= 15000) b.push(`✅ Est. ${fmt(profit)} wholesale profit at 70% ARV`)
+  if (lead.equity >= 25) b.push(`💎 ${lead.equity}% equity spread — strong position`)
+  const HIGH = ['Foreclosure','Tax Delinquency','Fire Damage','Bank Owned']
+  if (HIGH.some(t => lead.distressType?.includes(t))) b.push('⚠️ High-distress category — act quickly before competition')
+  if (b.length === 0) b.push('📋 Verify comps and repair estimates before offering')
+  return b
+}
+
 export default function LeadsTable({ API, t, totalLeadsInState }) {
   const [leads,        setLeads]        = useState([])
   const [total,        setTotal]        = useState(0)
@@ -38,6 +100,7 @@ export default function LeadsTable({ API, t, totalLeadsInState }) {
   const [loading,      setLoading]      = useState(false)
   const [expanded,     setExpanded]     = useState(null)
   const [aiToolsLead,  setAiToolsLead]  = useState(null)
+  const [viewMode,     setViewMode]     = useState('table') // 'table' | 'cards'
 
   const PAGE_SIZE = 25
 
@@ -157,17 +220,46 @@ export default function LeadsTable({ API, t, totalLeadsInState }) {
           })}
         </div>
 
-        <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--dr-text-faint)', whiteSpace: 'nowrap' }}>
-          {loading ? '⏳' : `${total} ${t('leads', 'leads')}`}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 12, color: 'var(--dr-text-faint)', whiteSpace: 'nowrap' }}>
+            {loading ? '⏳' : `${total} ${t('leads', 'leads')}`}
+          </span>
+          {/* View mode toggle */}
+          <div style={{ display: 'flex', background: 'var(--dr-surface-deep)', border: '1px solid var(--dr-border)', borderRadius: 8, overflow: 'hidden' }}>
+            {[['table','☰ Table'],['cards','⊞ Cards']].map(([mode, label]) => (
+              <button key={mode} onClick={() => setViewMode(mode)} style={{
+                padding: '5px 12px', border: 'none', cursor: 'pointer',
+                background: viewMode === mode ? '#2563eb' : 'transparent',
+                color: viewMode === mode ? 'white' : 'var(--dr-text-faint)',
+                fontSize: 11, fontWeight: 700, fontFamily: 'Inter, sans-serif', transition: 'all 0.15s',
+              }}>{label}</button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Table */}
+      {/* ── Card View ──────────────────────────────────────────────────── */}
+      {viewMode === 'cards' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16, marginBottom: 20 }}>
+          {leads.map((lead, i) => (
+            <OpportunityCard key={lead.id} opp={leadToOpp(lead)} index={i} t={t} API={API} />
+          ))}
+          {leads.length === 0 && !loading && (
+            <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '30px', color: 'var(--dr-text-faintest)', fontSize: 13 }}>
+              {t('No results match your search.', 'Ningún resultado coincide.')}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Table View ─────────────────────────────────────────────────── */}
+      {viewMode === 'table' && (
+      <>{/* Table */}
       <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid var(--dr-border)' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
             <tr style={{ background: 'var(--dr-surface-deep)', borderBottom: '1px solid var(--dr-border)' }}>
-              {['#', t('Address','Dirección'), t('Type','Tipo'), t('Beds/Ba/Sqft','Camas/Ba/Sqft'),
+              {['#', t('Address','Dirección'), t('Type','Tipo'), t('Score','Puntuación'), t('Beds/Ba/Sqft','Camas/Ba/Sqft'),
                 t('Owner (DEMO)','Propietario (DEMO)'), t('Phone (DEMO)','Tel (DEMO)'),
                 t('ARV','ARV'), t('Target Offer','Oferta'), t('Equity','Equidad'), t('DOM','DOM')
               ].map(h => (
@@ -209,6 +301,14 @@ export default function LeadsTable({ API, t, totalLeadsInState }) {
                           {ds.icon} {lead.distressType}
                         </span>
                       </td>
+                      {/* Deal score badge */}
+                      <td style={{ padding: '10px 12px' }}>
+                        {(() => { const s = calcScore(lead); const ss = scoreStyle(s); return (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '3px 8px', borderRadius: 20, background: ss.bg, border: `1px solid ${ss.border}`, color: ss.color, fontWeight: 800, fontSize: 10, whiteSpace: 'nowrap' }}>
+                            ⭐ {s}/10 <span style={{ fontSize: 9, opacity: 0.8 }}>{ss.label}</span>
+                          </span>
+                        )})()}
+                      </td>
                       <td style={{ padding: '10px 12px', color: 'var(--dr-text-3)', whiteSpace: 'nowrap', fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>
                         {lead.beds ?? '—'}bd / {lead.baths ?? '—'}ba
                         {lead.sqft ? <span style={{ color: 'var(--dr-text-faintest)', marginLeft: 4 }}>{Number(lead.sqft).toLocaleString()}sf</span> : null}
@@ -239,7 +339,7 @@ export default function LeadsTable({ API, t, totalLeadsInState }) {
                     {/* Expanded row */}
                     {isExp && (
                       <tr key={`${lead.id}-exp`} style={{ borderBottom: '1px solid var(--dr-border)', background: 'rgba(59,130,246,0.04)' }}>
-                        <td colSpan={10} style={{ padding: '0 12px 16px 12px' }}>
+                        <td colSpan={11} style={{ padding: '0 12px 16px 12px' }}>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, paddingTop: 12 }}>
 
                             {/* Property details */}
@@ -301,6 +401,16 @@ export default function LeadsTable({ API, t, totalLeadsInState }) {
                               </div>
                             </div>
 
+                            {/* Deal Insight (same as OpportunityCard) */}
+                            <div style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.22)', borderRadius: 10, padding: '11px 13px', gridColumn: '1 / -1' }}>
+                              <div style={{ fontSize: 10, fontWeight: 800, color: '#4ade80', letterSpacing: '0.08em', marginBottom: 7 }}>✦ DEAL INSIGHT</div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                {generateInsight(lead).map((b, i) => (
+                                  <div key={i} style={{ fontSize: 11, color: '#86efac', lineHeight: 1.55 }}>{b}</div>
+                                ))}
+                              </div>
+                            </div>
+
                             {/* AI Note */}
                             {lead.note && (
                               <div style={{ background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.2)', borderRadius: 10, padding: '12px 14px', gridColumn: '1 / -1' }}>
@@ -342,8 +452,10 @@ export default function LeadsTable({ API, t, totalLeadsInState }) {
           </div>
         )}
       </div>
+      </> /* end table view */
+      )}
 
-      {/* Pagination */}
+      {/* Pagination (both views) */}
       {pages > 1 && (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 16 }}>
           <PagBtn onClick={() => fetchLeads(page - 1)} disabled={page <= 1}>‹</PagBtn>

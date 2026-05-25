@@ -116,6 +116,21 @@ function buildRedfinUrl(address) {
   return `https://www.redfin.com/search?location=${encodeURIComponent(address)}`
 }
 
+function ContactRow({ label, value, href }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 11 }}>
+      <span style={{ color: 'var(--dr-text-faint)', flexShrink: 0, minWidth: 60 }}>{label}</span>
+      {href
+        ? <a href={href} style={{ color: '#93c5fd', fontWeight: 600, textDecoration: 'none', textAlign: 'right', wordBreak: 'break-all' }}
+            onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+            onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+          >{value}</a>
+        : <span style={{ color: 'var(--dr-text-2)', fontWeight: 600, textAlign: 'right' }}>{value}</span>
+      }
+    </div>
+  )
+}
+
 // ── AI Lead Target card (off-market category stub, no address) ────────────────
 function AILeadTargetCard({ opp, index, t }) {
   const style = getTypeStyle(opp.type)
@@ -319,6 +334,27 @@ export default function OpportunityCard({ opp, index, t, API = '' }) {
           🤖 {t('AI Tools — Scripts & Deal Memo', 'Herramientas IA — Scripts y Memo')}
         </button>
 
+        {/* Listing agent contact (MLS live data) */}
+        {listed && isLive && (opp.agentName || opp.agentPhone || opp.officeName) && (
+          <div style={{ background: 'rgba(37,99,235,0.07)', border: '1px solid rgba(37,99,235,0.22)', borderRadius: 10, padding: '11px 13px', marginTop: 8 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: '#60a5fa', letterSpacing: '0.08em', marginBottom: 7, display: 'flex', alignItems: 'center', gap: 5 }}>
+              📞 {t('LISTING AGENT', 'AGENTE DE LISTADO')}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {opp.agentName  && <ContactRow label="Agent"     value={opp.agentName} />}
+              {opp.agentPhone && <ContactRow label="Phone"     value={opp.agentPhone} href={`tel:${opp.agentPhone}`} />}
+              {opp.agentEmail && <ContactRow label="Email"     value={opp.agentEmail} href={`mailto:${opp.agentEmail}`} />}
+              {opp.officeName && <ContactRow label="Brokerage" value={opp.officeName} />}
+            </div>
+          </div>
+        )}
+
+        {/* No contact for AI-estimated listed or off-market */}
+        {listed && !isLive && (
+          <div style={{ marginTop: 8, fontSize: 11, color: 'var(--dr-text-faint)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            🤖 {t('AI-estimated listing — add RENTCAST_API_KEY for real agent contacts', 'Listado estimado — agrega RENTCAST_API_KEY para contactos reales')}
+          </div>
+        )}
         {!listed && (
           <div style={{ marginTop: 8, fontSize: 11, color: 'var(--dr-text-faint)', display: 'flex', alignItems: 'center', gap: 6 }}>
             🔒 {t('Off-market lead — contact owner directly', 'Lead fuera de mercado — contactar propietario directamente')}
