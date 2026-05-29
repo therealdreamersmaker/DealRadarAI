@@ -108,10 +108,17 @@ function mapListingToOpportunity(listing) {
   const arv          = Math.round(listPrice * conditionBonus);
   const targetOffer  = Math.round(arv * 0.70);
 
+  // Classify distress: require BOTH age AND price/sqft signal for Fixer-Upper
+  // so we don't mislabel a renovated vintage home
+  const pricePerSqftCheck = listing.squareFootage ? listPrice / listing.squareFootage : 999;
   let type = 'Active Listing';
-  if (listing.daysOnMarket > 90)                             type = 'Price Drop';
-  else if (listing.yearBuilt && listing.yearBuilt < 1980)    type = 'Fixer-Upper';
-  else if (listing.daysOnMarket > 45)                        type = 'Extended DOM';
+  if (listing.daysOnMarket > 90) {
+    type = 'Price Drop';
+  } else if (listing.yearBuilt && listing.yearBuilt < 1985 && pricePerSqftCheck < 110) {
+    type = 'Fixer-Upper';
+  } else if (listing.daysOnMarket > 45) {
+    type = 'Extended DOM';
+  }
 
   const bedBath = [
     listing.bedrooms    ? `${listing.bedrooms}bd`   : null,
@@ -250,29 +257,41 @@ async function buildAIListedFallback(location) {
   const { city, state } = parseLocation(location);
   const market = `${city}${state ? ', ' + state : ''}`;
 
-  const prompt = `Generate 6 realistic wholesale-opportunity MLS listings currently for sale in ${market}.
+  const prompt = `You are a wholesale real estate data generator. Generate 6 DISTRESSED MLS listings currently for sale in ${market}.
+
+CRITICAL RULES — every property MUST:
+- Be in POOR or FAIR condition: original fixtures, deferred maintenance, outdated systems, visible wear
+- Need significant work before it is retail-ready
+- NEVER be described as renovated, updated, remodeled, move-in ready, or recently improved
+- Have a note that describes SPECIFIC problems (e.g., "needs new roof and HVAC, original 1968 kitchen, cracked driveway, water damage in basement")
+
 Return ONLY a valid JSON array — no markdown, no code fences, no explanation.
 
 Schema for each object:
 {
-  "type": string,      // One of: "Price Drop" | "Fixer-Upper" | "Extended DOM" | "Active Listing"
-  "address": string,   // Real-sounding full address in ${market}
-  "listPrice": number, // 120000–350000 (wholesale-friendly range)
-  "arv": number,       // listPrice × 1.05–1.15
+  "type": string,        // One of: "Price Drop" | "Fixer-Upper" | "Extended DOM"
+  "address": string,     // Real-sounding full address in ${market}
+  "listPrice": number,   // 90000–280000 (distressed/below-market pricing)
+  "arv": number,         // listPrice × 1.18–1.35 (after full repair)
   "targetOffer": number, // arv × 0.70
   "daysOnMarket": number,
   "beds": number,
   "baths": number,
-  "sqft": number,      // 950–2400
-  "yearBuilt": number,
-  "note": string       // 1-sentence wholesaler insight
+  "sqft": number,        // 900–2200
+  "yearBuilt": number,   // 1945–1990 (older stock = more distress)
+  "note": string         // Describe the SPECIFIC PROBLEMS: what needs repair, owner distress signal, wholesale angle
 }
 
-Distribution: 2 Price Drop (dom 61–120), 2 Fixer-Upper (yearBuilt < 1985, dom 15–55), 1 Extended DOM (dom 46–90), 1 Active Listing (dom < 30).
-All prices in USD integers. Use zip codes realistic for ${market}.`;
+Distribution:
+- 2 Price Drop: dom 61–120, price recently reduced, property has obvious condition issues
+- 2 Fixer-Upper: yearBuilt before 1985, dom 15–60, needs full rehab (roof, HVAC, kitchen, baths)
+- 2 Extended DOM: dom 46–100, sitting unsold due to condition problems or overpriced for condition
+
+ALL properties need work. No exceptions.
+All prices in USD integers. Use zip codes and street names realistic for ${market}.`;
 
   try {
-    console.log(`[Listings] Generating AI-estimated listed properties for: ${market}`);
+    console.log(`[Listings] Generating AI-estimated distressed listings for: ${market}`);
     const raw = await generateText(prompt);
     const jsonMatch = raw.match(/\[[\s\S]*\]/);
     if (!jsonMatch) throw new Error('No JSON array in response');
@@ -283,15 +302,15 @@ All prices in USD integers. Use zip codes realistic for ${market}.`;
       const beds  = p.beds   || null;
       const baths = p.baths  || null;
       return {
-        type:         p.type         || 'Active Listing',
+        type:         p.type         || 'Fixer-Upper',
         address:      addr,
-        listPrice:    Number(p.listPrice)   || null,
-        arv:          Number(p.arv)         || null,
-        targetOffer:  Number(p.targetOffer) || null,
-        daysOnMarket: Number(p.daysOnMarket)|| 0,
+        listPrice:    Number(p.listPrice)    || null,
+        arv:          Number(p.arv)          || null,
+        targetOffer:  Number(p.targetOffer)  || null,
+        daysOnMarket: Number(p.daysOnMarket) || 0,
         bedBath:      (beds && baths) ? `${beds}bd/${baths}ba` : (beds ? `${beds}bd` : null),
-        sqft:         Number(p.sqft)        || null,
-        yearBuilt:    Number(p.yearBuilt)   || null,
+        sqft:         Number(p.sqft)         || null,
+        yearBuilt:    Number(p.yearBuilt)    || null,
         isListed:     true,
         mlsNumber:    null,
         dataSource:   'ai-estimate',
