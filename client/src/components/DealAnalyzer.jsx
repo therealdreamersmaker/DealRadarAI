@@ -29,6 +29,23 @@ const VERDICT_CFG = {
 const NBHD_LABEL = { A: 'Prime', B: 'Good', C: 'Average', D: 'Distressed' }
 const NBHD_COLOR = { A: '#22c55e', B: '#60a5fa', C: '#fbbf24', D: '#f87171' }
 
+const DEAL_STATUS_CFG = {
+  'GOLDEN DEAL':             { color: '#22c55e', bg: 'rgba(34,197,94,0.15)',   border: 'rgba(34,197,94,0.5)',   icon: '🏆', glow: 'rgba(34,197,94,0.3)' },
+  'DEAL SPREAD ACCEPTED':    { color: '#fbbf24', bg: 'rgba(251,191,36,0.15)',  border: 'rgba(251,191,36,0.5)',  icon: '✅', glow: 'rgba(251,191,36,0.2)' },
+  'UNPROFITABLE - OVERPRICED':{ color: '#f87171', bg: 'rgba(239,68,68,0.15)',   border: 'rgba(239,68,68,0.5)',   icon: '❌', glow: 'rgba(239,68,68,0.2)' },
+  'DISQUALIFIED':            { color: '#94a3b8', bg: 'rgba(148,163,184,0.15)', border: 'rgba(148,163,184,0.5)', icon: '🚫', glow: 'rgba(148,163,184,0.2)' },
+}
+const CONDITION_TIER_CFG = {
+  1: { label: 'Cosmetic Clean',  color: '#22c55e', bg: 'rgba(34,197,94,0.1)',   desc: 'Paint, carpet, landscaping only',               discount: '30%' },
+  2: { label: 'Average Fixer',   color: '#fbbf24', bg: 'rgba(251,191,36,0.1)',  desc: 'Kitchen, baths, flooring + 1 major mechanical', discount: '40%' },
+  3: { label: 'Total Gut Job',   color: '#f87171', bg: 'rgba(239,68,68,0.1)',   desc: 'Structural / foundation / mold / fire damage',   discount: '50%' },
+}
+const LIQUIDITY_CFG = {
+  'Liquid':            { color: '#22c55e', icon: '🟢', desc: 'MoS 2–4 months — ideal for wholesaling' },
+  'Hyper-Competitive': { color: '#f97316', icon: '🔥', desc: 'MoS < 1.5 months — deep discounts are hard to achieve' },
+  'Stagnant':          { color: '#f87171', icon: '🔴', desc: 'MoS > 5 months — exit will be slow' },
+}
+
 // ── Stable save-id derived from result address ────────────────────────────────
 function buildSaveId(result) {
   const addr = (result.address || 'unknown').replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 60)
@@ -417,6 +434,47 @@ export default function DealAnalyzer({ API, t, language }) {
               </div>
             )}
 
+            {/* ── DEAL STATUS BANNER ───────────────────────────────── */}
+            {result.dealStatus && (() => {
+              const ds = DEAL_STATUS_CFG[result.dealStatus] || DEAL_STATUS_CFG['DEAL SPREAD ACCEPTED']
+              return (
+                <div style={{
+                  marginTop: 18,
+                  background: ds.bg,
+                  border: `2px solid ${ds.border}`,
+                  borderRadius: 14,
+                  padding: '18px 22px',
+                  display: 'flex', alignItems: 'center', gap: 16,
+                  boxShadow: `0 0 24px ${ds.glow}`,
+                }}>
+                  <span style={{ fontSize: 32, flexShrink: 0 }}>{ds.icon}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: ds.color, marginBottom: 4 }}>
+                      5-PHASE UNDERWRITING VERDICT
+                    </div>
+                    <div style={{ fontSize: 22, fontWeight: 900, color: ds.color, letterSpacing: '-0.5px', lineHeight: 1.1 }}>
+                      {result.dealStatus}
+                    </div>
+                    {result.mao && (
+                      <div style={{ fontSize: 12, color: 'var(--dr-text-faint)', marginTop: 6 }}>
+                        Maximum Allowable Offer (MAO): <span style={{ color: ds.color, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', fontSize: 14 }}>{fmt(result.mao)}</span>
+                        {result.estimatedValue && result.mao && (
+                          <span style={{ marginLeft: 12, color: result.estimatedValue <= result.mao ? '#4ade80' : '#f87171', fontWeight: 700, fontSize: 11 }}>
+                            {result.estimatedValue <= result.mao ? `✓ As-is value ${fmt(result.estimatedValue)} is under MAO` : `⚠ As-is value ${fmt(result.estimatedValue)} exceeds MAO`}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {result.buyBoxPass === false && (
+                    <div style={{ fontSize: 10, fontWeight: 700, padding: '5px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', flexShrink: 0 }}>
+                      ⚠ BUY-BOX FAIL
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+
             {/* ── Action buttons ──────────────────────────────────── */}
             <div className="no-print" style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
               {/* Save / Unsave */}
@@ -457,6 +515,70 @@ export default function DealAnalyzer({ API, t, language }) {
             </div>
           </div>
 
+          {/* ── Phase 4: MAO Breakdown (full-width) ─────────────── */}
+          {result.maoBreakdown && (
+            <div style={{ background: 'var(--dr-surface)', border: '2px solid rgba(34,197,94,0.3)', borderRadius: 16, padding: '20px 24px', marginBottom: 16 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#4ade80', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                🧮 PHASE 4 — MAXIMUM ALLOWABLE OFFER (MAO) CALCULATION
+                <span style={{ fontSize: 9, color: 'var(--dr-text-faint)', marginLeft: 4 }}>· {(result.marketModifier * 100)}% Rule · {(result.repairDiscount * 100)}% Repair Discount · ${(result.wholesaleFee || 0).toLocaleString()} Wholesale Fee</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, alignItems: 'center' }}>
+                {/* Step 1 */}
+                <div style={{ background: 'var(--dr-surface-deep)', borderRadius: 10, padding: '14px 16px', border: '1px solid rgba(96,165,250,0.2)' }}>
+                  <div style={{ fontSize: 9, color: '#60a5fa', fontWeight: 700, letterSpacing: '0.08em', marginBottom: 4 }}>STEP 1 — ARV × MODIFIER</div>
+                  <div style={{ fontSize: 11, color: 'var(--dr-text-faint)', marginBottom: 4 }}>
+                    {fmt(result.arv)} × {result.marketModifier}
+                  </div>
+                  <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#60a5fa' }}>
+                    {fmt(result.maoBreakdown.step1_arvTimesModifier)}
+                  </div>
+                </div>
+                <div style={{ fontSize: 20, color: 'var(--dr-text-faintest)', textAlign: 'center', flexShrink: 0 }}>−</div>
+                {/* Step 2 */}
+                <div style={{ background: 'var(--dr-surface-deep)', borderRadius: 10, padding: '14px 16px', border: '1px solid rgba(249,115,22,0.2)' }}>
+                  <div style={{ fontSize: 9, color: '#f97316', fontWeight: 700, letterSpacing: '0.08em', marginBottom: 4 }}>STEP 2 — REPAIR COSTS</div>
+                  <div style={{ fontSize: 11, color: 'var(--dr-text-faint)', marginBottom: 4 }}>
+                    {result.conditionLabel} · {(result.repairDiscount * 100)}% of ARV
+                  </div>
+                  <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#f97316' }}>
+                    −{fmt(result.repairCostTotal)}
+                  </div>
+                </div>
+                <div style={{ fontSize: 20, color: 'var(--dr-text-faintest)', textAlign: 'center', flexShrink: 0 }}>−</div>
+                {/* Step 3 */}
+                <div style={{ background: 'var(--dr-surface-deep)', borderRadius: 10, padding: '14px 16px', border: '1px solid rgba(167,139,250,0.2)' }}>
+                  <div style={{ fontSize: 9, color: '#a78bfa', fontWeight: 700, letterSpacing: '0.08em', marginBottom: 4 }}>STEP 3 — WHOLESALE FEE</div>
+                  <div style={{ fontSize: 11, color: 'var(--dr-text-faint)', marginBottom: 4 }}>
+                    Wholesaler assignment spread
+                  </div>
+                  <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#a78bfa' }}>
+                    −{fmt(result.wholesaleFee)}
+                  </div>
+                </div>
+                <div style={{ fontSize: 20, color: '#4ade80', textAlign: 'center', flexShrink: 0 }}>═</div>
+                {/* MAO result */}
+                <div style={{ background: 'rgba(34,197,94,0.08)', borderRadius: 10, padding: '14px 16px', border: '2px solid rgba(34,197,94,0.35)' }}>
+                  <div style={{ fontSize: 9, color: '#4ade80', fontWeight: 800, letterSpacing: '0.08em', marginBottom: 4 }}>✓ YOUR MAO</div>
+                  <div style={{ fontSize: 11, color: 'var(--dr-text-faint)', marginBottom: 4 }}>
+                    Maximum Allowable Offer
+                  </div>
+                  <div style={{ fontSize: 24, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', color: '#4ade80' }}>
+                    {fmt(result.mao)}
+                  </div>
+                </div>
+              </div>
+              {/* ARV source note */}
+              {result.compsAvgPpsft && (
+                <div style={{ marginTop: 12, fontSize: 11, color: 'var(--dr-text-faint)', background: 'var(--dr-surface-deep)', borderRadius: 8, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ color: '#60a5fa', fontWeight: 700 }}>🏡 ARV Method:</span>
+                  Avg $/sqft of top 3 renovated comps: <span style={{ color: '#a78bfa', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700 }}>${fmtN(result.compsAvgPpsft)}/sqft</span>
+                  &nbsp;×&nbsp;{fmtN(result.sqft)} sqft
+                  &nbsp;=&nbsp;<span style={{ color: '#60a5fa', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700 }}>{fmt(result.arv)} ARV</span>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── Main grid ───────────────────────────────────────── */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 16 }}>
 
@@ -492,6 +614,72 @@ export default function DealAnalyzer({ API, t, language }) {
                   <span style={{ color: c, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>{v}</span>
                 </div>
               ))}
+            </Card>
+
+            {/* Phase 3: Condition Tier */}
+            {result.conditionTier && (() => {
+              const ct = CONDITION_TIER_CFG[result.conditionTier] || CONDITION_TIER_CFG[2]
+              return (
+                <Card title="Phase 3 — Condition Assessment" icon="🔨" color={`${ct.color}44`}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
+                    <div style={{ width: 52, height: 52, borderRadius: 12, background: ct.bg, border: `2px solid ${ct.color}55`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <div style={{ fontSize: 18, fontWeight: 900, color: ct.color, lineHeight: 1 }}>T{result.conditionTier}</div>
+                      <div style={{ fontSize: 8, color: ct.color, opacity: 0.7, fontWeight: 700 }}>TIER</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: ct.color, marginBottom: 2 }}>{ct.label}</div>
+                      <div style={{ fontSize: 11, color: 'var(--dr-text-faint)' }}>{ct.desc}</div>
+                    </div>
+                  </div>
+                  {[
+                    ['Condition Rating', `${result.conditionRating}/9`],
+                    ['Repair Discount Applied', ct.discount],
+                    ['Repair Cost (Est.)', fmt(result.repairCostTotal)],
+                    ['Cost Per Sqft', result.repairCostPerSqft ? `$${Math.round(result.repairCostPerSqft)}/sqft` : '—'],
+                  ].map(([l, v]) => (
+                    <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--dr-border)', fontSize: 12 }}>
+                      <span style={{ color: 'var(--dr-text-faint)' }}>{l}</span>
+                      <span style={{ color: ct.color, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>{v}</span>
+                    </div>
+                  ))}
+                  <div style={{ marginTop: 10, fontSize: 10, color: 'var(--dr-text-faintest)', lineHeight: 1.5, fontStyle: 'italic' }}>
+                    ⚖ Conservative rule: when borderline between tiers, AI defaults to more expensive tier
+                  </div>
+                </Card>
+              )
+            })()}
+
+            {/* Phase 1: Market Liquidity + Buy Box */}
+            <Card title="Phase 1 — Market Liquidity" icon="📊" color="rgba(96,165,250,0.25)">
+              {result.marketLiquidity && (() => {
+                const lq = LIQUIDITY_CFG[result.marketLiquidity] || LIQUIDITY_CFG['Liquid']
+                return (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <span style={{ fontSize: 18 }}>{lq.icon}</span>
+                      <span style={{ fontSize: 14, fontWeight: 800, color: lq.color }}>{result.marketLiquidity}</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--dr-text-faint)', marginBottom: 12 }}>{lq.desc}</div>
+                  </div>
+                )
+              })()}
+              {[
+                ['Months of Supply', result.monthsOfSupply ? `${result.monthsOfSupply} months` : '—'],
+                ['Market Modifier', result.marketModifier ? `${(result.marketModifier * 100)}% Rule` : '—'],
+                ['Buy-Box Pass', result.buyBoxPass === true ? '✓ Pass' : result.buyBoxPass === false ? '✗ Fail' : '—'],
+              ].map(([l, v]) => (
+                <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--dr-border)', fontSize: 12 }}>
+                  <span style={{ color: 'var(--dr-text-faint)' }}>{l}</span>
+                  <span style={{ color: v.startsWith('✓') ? '#22c55e' : v.startsWith('✗') ? '#f87171' : '#60a5fa', fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>{v}</span>
+                </div>
+              ))}
+              {result.buyBoxIssues?.length > 0 && (
+                <div style={{ marginTop: 10 }}>
+                  {result.buyBoxIssues.map((issue, i) => (
+                    <div key={i} style={{ fontSize: 11, color: '#fca5a5', padding: '3px 0', lineHeight: 1.5 }}>⚠ {issue}</div>
+                  ))}
+                </div>
+              )}
             </Card>
 
             {/* $/sqft comparison */}
@@ -577,21 +765,28 @@ export default function DealAnalyzer({ API, t, language }) {
 
           {/* ── Comparable Sales ─────────────────────────────────── */}
           {result.comps?.length > 0 && (
-            <Card title="Comparable Sales (AI Estimated)" icon="🏡" color="rgba(52,211,153,0.25)" style={{ marginBottom: 16 }}>
+            <Card title="Phase 2 — Comparable Sales (Renovated Only for ARV)" icon="🏡" color="rgba(52,211,153,0.25)" style={{ marginBottom: 16 }}>
+              {result.compsAvgPpsft && (
+                <div style={{ marginBottom: 10, fontSize: 11, color: 'var(--dr-text-faint)', background: 'var(--dr-surface-deep)', borderRadius: 8, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>🏆 <strong style={{ color: '#4ade80' }}>ARV comps average:</strong></span>
+                  <span style={{ color: '#a78bfa', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700 }}>${fmtN(result.compsAvgPpsft)}/sqft</span>
+                  <span style={{ color: 'var(--dr-text-faintest' }}>· Only renovated/remodeled sales used · max 0.5-mile radius · last 180 days</span>
+                </div>
+              )}
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                   <thead>
                     <tr style={{ background: 'var(--dr-surface-deep)' }}>
-                      {['Address', 'Sold', 'Date', 'Beds/Bath', 'Sqft', '$/sqft', 'Condition', 'Distance'].map(h => (
+                      {['Address', 'Sold', 'Date', 'Beds/Bath', 'Sqft', '$/sqft', 'Condition', 'Used for ARV', 'Distance'].map(h => (
                         <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--dr-text-faint)', fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {result.comps.map((comp, i) => {
-                      const condColor = { Updated: '#22c55e', Average: '#fbbf24', 'Needs Work': '#f87171' }[comp.condition] || '#94a3b8'
+                      const condColor = { Renovated: '#22c55e', Updated: '#22c55e', Average: '#fbbf24', 'Needs Work': '#f87171' }[comp.condition] || '#94a3b8'
                       return (
-                        <tr key={i} style={{ borderBottom: '1px solid var(--dr-border)', background: i % 2 === 0 ? 'var(--dr-surface-deep)' : 'transparent' }}>
+                        <tr key={i} style={{ borderBottom: '1px solid var(--dr-border)', background: comp.usedForArv ? 'rgba(34,197,94,0.04)' : i % 2 === 0 ? 'var(--dr-surface-deep)' : 'transparent' }}>
                           <td style={{ padding: '9px 12px', color: 'var(--dr-text-2)', fontWeight: 600 }}>{comp.address}</td>
                           <td style={{ padding: '9px 12px', color: '#22c55e', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700 }}>{fmt(comp.soldPrice)}</td>
                           <td style={{ padding: '9px 12px', color: 'var(--dr-text-faint)', whiteSpace: 'nowrap' }}>{comp.soldDate}</td>
@@ -599,6 +794,11 @@ export default function DealAnalyzer({ API, t, language }) {
                           <td style={{ padding: '9px 12px', color: 'var(--dr-text-muted)', fontFamily: 'JetBrains Mono, monospace' }}>{fmtN(comp.sqft)}</td>
                           <td style={{ padding: '9px 12px', color: '#a78bfa', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700 }}>${fmtN(comp.pricePerSqft)}</td>
                           <td style={{ padding: '9px 12px' }}><span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: `${condColor}18`, color: condColor }}>{comp.condition}</span></td>
+                          <td style={{ padding: '9px 12px', textAlign: 'center' }}>
+                            {comp.usedForArv
+                              ? <span style={{ fontSize: 10, fontWeight: 800, color: '#4ade80' }}>✓ ARV</span>
+                              : <span style={{ fontSize: 10, color: 'var(--dr-text-faintest)' }}>—</span>}
+                          </td>
                           <td style={{ padding: '9px 12px', color: 'var(--dr-text-faint)', fontSize: 11 }}>{comp.distanceDesc}</td>
                         </tr>
                       )
@@ -607,6 +807,40 @@ export default function DealAnalyzer({ API, t, language }) {
                 </table>
               </div>
             </Card>
+          )}
+
+          {/* ── Phase 5: Deal-Killer Audit ───────────────────────── */}
+          {result.dealKillers?.length > 0 && (
+            <div style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.35)', borderRadius: 16, padding: '18px 20px', marginBottom: 16 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#f87171', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                🚨 PHASE 5 — DEAL-KILLER AUDIT
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {result.dealKillers.map((dk, i) => {
+                  const impactColor = dk.impact === 'Disqualify' ? '#f87171' : dk.impact === 'Penalize ARV 15%' ? '#f97316' : dk.impact === 'Short Sale Only' ? '#fbbf24' : '#94a3b8'
+                  return (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, background: 'var(--dr-surface)', borderRadius: 10, padding: '12px 14px', border: `1px solid ${impactColor}33` }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: impactColor, marginTop: 4, flexShrink: 0 }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 11, fontWeight: 800, color: impactColor, marginBottom: 3 }}>{dk.type}</div>
+                        <div style={{ fontSize: 12, color: 'var(--dr-text-3)', lineHeight: 1.6 }}>{dk.description}</div>
+                      </div>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 8, background: `${impactColor}18`, border: `1px solid ${impactColor}44`, color: impactColor, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                        {dk.impact}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+              {(result.equityLockupRisk === 'Short Sale Only' || result.equityLockupRisk === 'High') && result.estimatedMortgageBalance && (
+                <div style={{ marginTop: 12, fontSize: 11, color: '#fbbf24', background: 'rgba(251,191,36,0.07)', borderRadius: 8, padding: '8px 12px', border: '1px solid rgba(251,191,36,0.25)' }}>
+                  🏦 Est. mortgage balance: <strong>{fmt(result.estimatedMortgageBalance)}</strong> vs MAO: <strong>{fmt(result.mao)}</strong>
+                  {result.estimatedMortgageBalance > result.mao
+                    ? ' — owner cannot pay off bank at your MAO. Short sale required.'
+                    : ' — owner has enough equity to close.'}
+                </div>
+              )}
+            </div>
           )}
 
           {/* ── Insights + Red Flags + Negotiation ───────────────── */}
