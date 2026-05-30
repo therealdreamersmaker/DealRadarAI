@@ -99,6 +99,46 @@ function wholesaleScore(listing) {
   return score;
 }
 
+/**
+ * Phase 3 + Phase 4 underwriting for a RentCast real listing.
+ * Derives condition tier from yearBuilt + price/sqft signals,
+ * then calculates MAO using the exact 5-Phase formula.
+ */
+function computeConditionAndMao(listing, arv, listPrice) {
+  const yearBuilt = listing.yearBuilt || 1980;
+  const ppsf      = listing.squareFootage ? listPrice / listing.squareFootage : 999;
+
+  // Phase 3 — Condition Tier
+  let conditionTier, repairDiscount, conditionLabel, conditionRating;
+  if (yearBuilt < 1960 || ppsf < 50) {
+    conditionTier  = 3; repairDiscount = 0.50;
+    conditionLabel = 'Total Gut Job'; conditionRating = 2;
+  } else if (yearBuilt < 1985 && ppsf < 110) {
+    conditionTier  = 2; repairDiscount = 0.40;
+    conditionLabel = 'Average Fixer'; conditionRating = 5;
+  } else {
+    conditionTier  = 1; repairDiscount = 0.30;
+    conditionLabel = 'Cosmetic Clean'; conditionRating = 7;
+  }
+
+  // Phase 4 — MAO Formula
+  const marketModifier  = 0.70; // RentCast markets default to stable
+  const wholesaleFee    = 12000;
+  const repairCostTotal = Math.round(arv * repairDiscount);
+  const mao             = Math.round((arv * marketModifier) - repairCostTotal - wholesaleFee);
+
+  let dealStatus;
+  if (listPrice <= mao)          dealStatus = 'GOLDEN DEAL';
+  else if (listPrice <= mao * 1.05) dealStatus = 'DEAL SPREAD ACCEPTED';
+  else                           dealStatus = 'UNPROFITABLE - OVERPRICED';
+
+  return {
+    conditionTier, conditionLabel, conditionRating,
+    repairDiscount, repairCostTotal,
+    marketModifier, wholesaleFee, mao, dealStatus,
+  };
+}
+
 function mapListingToOpportunity(listing) {
   const address = listing.formattedAddress || `${listing.addressLine1}, ${listing.city}, ${listing.state} ${listing.zipCode}`;
   const listPrice = listing.price || 0;
@@ -125,11 +165,15 @@ function mapListingToOpportunity(listing) {
     listing.bathrooms   ? `${listing.bathrooms}ba`  : null,
   ].filter(Boolean).join('/') || '—';
 
+  // Phase 3 + 4: condition tier & MAO
+  const condMao = computeConditionAndMao(listing, arv, listPrice);
+
   return {
     type,
     address,
     arv,
-    targetOffer,
+    targetOffer: condMao.mao, // MAO is the canonical target offer
+    mao:         condMao.mao,
     listPrice,
     daysOnMarket: listing.daysOnMarket || 0,
     bedBath,
@@ -145,6 +189,8 @@ function mapListingToOpportunity(listing) {
     agentPhone: listing.listAgentPhone || null,
     agentEmail: listing.listAgentEmail || null,
     officeName: listing.listOfficeName || listing.listBrokerName || null,
+    // Phase 3 + 4 fields
+    ...condMao,
   };
 }
 
@@ -257,7 +303,7 @@ async function buildAIListedFallback(location) {
   const { city, state } = parseLocation(location);
   const market = `${city}${state ? ', ' + state : ''}`;
 
-  const prompt = `You are a wholesale real estate data generator. Generate 6 DISTRESSED MLS listings currently for sale in ${market}.
+  const prompt = `You are a wholesale real estate data generator executing the 5-Phase Elite Wholesaler Underwriting Protocol. Generate 6 DISTRESSED MLS listings currently for sale in ${market}.
 
 CRITICAL RULES — every property MUST:
 - Be in POOR or FAIR condition: original fixtures, deferred maintenance, outdated systems, visible wear
@@ -265,21 +311,48 @@ CRITICAL RULES — every property MUST:
 - NEVER be described as renovated, updated, remodeled, move-in ready, or recently improved
 - Have a note that describes SPECIFIC problems (e.g., "needs new roof and HVAC, original 1968 kitchen, cracked driveway, water damage in basement")
 
+PHASE 3 — CONDITION TIER CLASSIFICATION (for each property):
+Classify into ONE tier. When borderline, ALWAYS choose the more expensive tier.
+  Tier 1 — Cosmetic Clean (conditionRating 7-9): needs paint, carpet, light landscaping only — repairDiscount = 0.30
+  Tier 2 — Average Fixer (conditionRating 4-6): full kitchen/bath update + one major mechanical (HVAC, roof, electrical, plumbing) — repairDiscount = 0.40
+  Tier 3 — Total Gut Job (conditionRating 1-3): structural damage, mold, fire, or fully abandoned — repairDiscount = 0.50
+repairCostTotal = arv x repairDiscount
+
+PHASE 4 — MAO FINANCIAL ENGINE:
+marketModifier = 0.70 (stable market default)
+wholesaleFee = 12000
+mao = (arv x marketModifier) - repairCostTotal - wholesaleFee
+targetOffer = mao
+
+dealStatus (compare listPrice to mao):
+  "GOLDEN DEAL"               — listPrice <= mao
+  "DEAL SPREAD ACCEPTED"      — listPrice <= mao x 1.05
+  "UNPROFITABLE - OVERPRICED" — listPrice > mao x 1.05
+
 Return ONLY a valid JSON array — no markdown, no code fences, no explanation.
 
 Schema for each object:
 {
-  "type": string,        // One of: "Price Drop" | "Fixer-Upper" | "Extended DOM"
-  "address": string,     // Real-sounding full address in ${market}
-  "listPrice": number,   // 90000–280000 (distressed/below-market pricing)
-  "arv": number,         // listPrice × 1.18–1.35 (after full repair)
-  "targetOffer": number, // arv × 0.70
+  "type": string,           // One of: "Price Drop" | "Fixer-Upper" | "Extended DOM"
+  "address": string,        // Real-sounding full address in ${market}
+  "listPrice": number,      // 90000–280000 (distressed/below-market pricing)
+  "arv": number,            // listPrice × 1.18–1.35 (after full repair)
+  "conditionTier": number,  // 1, 2, or 3
+  "conditionLabel": string, // "Cosmetic Clean" | "Average Fixer" | "Total Gut Job"
+  "conditionRating": number,// 1-9 based on tier
+  "repairDiscount": number, // 0.30 | 0.40 | 0.50
+  "repairCostTotal": number,// arv x repairDiscount
+  "marketModifier": 0.70,
+  "wholesaleFee": 12000,
+  "mao": number,            // (arv x 0.70) - repairCostTotal - 12000
+  "targetOffer": number,    // = mao
+  "dealStatus": string,     // "GOLDEN DEAL" | "DEAL SPREAD ACCEPTED" | "UNPROFITABLE - OVERPRICED"
   "daysOnMarket": number,
   "beds": number,
   "baths": number,
-  "sqft": number,        // 900–2200
-  "yearBuilt": number,   // 1945–1990 (older stock = more distress)
-  "note": string         // Describe the SPECIFIC PROBLEMS: what needs repair, owner distress signal, wholesale angle
+  "sqft": number,           // 900–2200
+  "yearBuilt": number,      // 1945–1990 (older stock = more distress)
+  "note": string            // Describe BOTH specific owner financial distress AND specific physical condition problems
 }
 
 Distribution:
@@ -301,22 +374,33 @@ All prices in USD integers. Use zip codes and street names realistic for ${marke
       const addr  = p.address || '';
       const beds  = p.beds   || null;
       const baths = p.baths  || null;
+      const arv       = Number(p.arv)         || null;
+      const mao       = Number(p.mao)         || (arv ? Math.round(arv * 0.70 * 0.70 - 12000) : null);
       return {
-        type:         p.type         || 'Fixer-Upper',
-        address:      addr,
-        listPrice:    Number(p.listPrice)    || null,
-        arv:          Number(p.arv)          || null,
-        targetOffer:  Number(p.targetOffer)  || null,
-        daysOnMarket: Number(p.daysOnMarket) || 0,
-        bedBath:      (beds && baths) ? `${beds}bd/${baths}ba` : (beds ? `${beds}bd` : null),
-        sqft:         Number(p.sqft)         || null,
-        yearBuilt:    Number(p.yearBuilt)    || null,
-        isListed:     true,
-        mlsNumber:    null,
-        dataSource:   'ai-estimate',
-        note:         p.note || '',
-        zillowUrl:    addr ? buildZillowUrl(addr) : null,
-        redfinUrl:    addr ? buildRedfinUrl(addr) : null,
+        type:            p.type              || 'Fixer-Upper',
+        address:         addr,
+        listPrice:       Number(p.listPrice) || null,
+        arv,
+        conditionTier:   Number(p.conditionTier)   || 2,
+        conditionLabel:  p.conditionLabel          || 'Average Fixer',
+        conditionRating: Number(p.conditionRating) || 5,
+        repairDiscount:  Number(p.repairDiscount)  || 0.40,
+        repairCostTotal: Number(p.repairCostTotal) || (arv ? Math.round(arv * 0.40) : null),
+        marketModifier:  Number(p.marketModifier)  || 0.70,
+        wholesaleFee:    Number(p.wholesaleFee)    || 12000,
+        mao,
+        targetOffer:     mao,
+        dealStatus:      p.dealStatus              || 'DEAL SPREAD ACCEPTED',
+        daysOnMarket:    Number(p.daysOnMarket)    || 0,
+        bedBath:         (beds && baths) ? `${beds}bd/${baths}ba` : (beds ? `${beds}bd` : null),
+        sqft:            Number(p.sqft)            || null,
+        yearBuilt:       Number(p.yearBuilt)       || null,
+        isListed:        true,
+        mlsNumber:       null,
+        dataSource:      'ai-estimate',
+        note:            p.note || '',
+        zillowUrl:       addr ? buildZillowUrl(addr) : null,
+        redfinUrl:       addr ? buildRedfinUrl(addr) : null,
       };
     });
   } catch (err) {

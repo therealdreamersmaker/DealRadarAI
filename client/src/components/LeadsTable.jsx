@@ -265,9 +265,9 @@ export default function LeadsTable({ API, t, totalLeadsInState }) {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
             <tr style={{ background: 'var(--dr-surface-deep)', borderBottom: '1px solid var(--dr-border)' }}>
-              {['#', t('Address','Dirección'), t('Type','Tipo'), t('Score','Puntuación'), t('Beds/Ba/Sqft','Camas/Ba/Sqft'),
+              {['#', t('Address','Dirección'), t('Type','Tipo'), t('Score','Puntuación'), t('Status','Estado'), t('Beds/Ba/Sqft','Camas/Ba/Sqft'),
                 t('Owner (DEMO)','Propietario (DEMO)'), t('Phone (DEMO)','Tel (DEMO)'),
-                t('ARV','ARV'), t('Target Offer','Oferta'), t('Equity','Equidad'), t('DOM','DOM')
+                t('ARV','ARV'), t('MAO / Offer','MAO / Oferta'), t('Equity','Equidad'), t('DOM','DOM')
               ].map(h => (
                 <th key={h} style={{ padding: '10px 12px', textAlign: 'left', color: 'var(--dr-text-faint)', fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>
                   {h}
@@ -315,6 +315,22 @@ export default function LeadsTable({ API, t, totalLeadsInState }) {
                           </span>
                         )})()}
                       </td>
+                      {/* Deal Status chip */}
+                      <td style={{ padding: '10px 12px' }}>
+                        {lead.dealStatus ? (() => {
+                          const DS_MAP = {
+                            'GOLDEN DEAL':               { icon: '🏆', abbr: 'GOLDEN',   color: '#22c55e', bg: 'rgba(34,197,94,0.12)',   border: 'rgba(34,197,94,0.3)'   },
+                            'DEAL SPREAD ACCEPTED':      { icon: '✅', abbr: 'ACCEPTED', color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.3)'  },
+                            'UNPROFITABLE - OVERPRICED': { icon: '❌', abbr: 'OVERPRICED',color: '#f87171', bg: 'rgba(248,113,113,0.12)',border: 'rgba(248,113,113,0.3)' },
+                          }
+                          const cfg = DS_MAP[lead.dealStatus] || { icon: '—', abbr: lead.dealStatus, color: '#6b7280', bg: 'transparent', border: '#6b7280' }
+                          return (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '3px 8px', borderRadius: 20, background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color, fontWeight: 700, fontSize: 9, whiteSpace: 'nowrap' }}>
+                              {cfg.icon} {cfg.abbr}
+                            </span>
+                          )
+                        })() : <span style={{ color: 'var(--dr-text-faintest)', fontSize: 10 }}>—</span>}
+                      </td>
                       <td style={{ padding: '10px 12px', color: 'var(--dr-text-3)', whiteSpace: 'nowrap', fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>
                         {lead.beds ?? '—'}bd / {lead.baths ?? '—'}ba
                         {lead.sqft ? <span style={{ color: 'var(--dr-text-faintest)', marginLeft: 4 }}>{Number(lead.sqft).toLocaleString()}sf</span> : null}
@@ -346,7 +362,7 @@ export default function LeadsTable({ API, t, totalLeadsInState }) {
                     {/* Expanded row */}
                     {isExp && (
                       <tr key={`${lead.id}-exp`} style={{ borderBottom: '1px solid var(--dr-border)', background: 'rgba(59,130,246,0.04)' }}>
-                        <td colSpan={11} style={{ padding: '0 12px 16px 12px' }}>
+                        <td colSpan={12} style={{ padding: '0 12px 16px 12px' }}>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, paddingTop: 12 }}>
 
                             {/* Property details */}
@@ -372,16 +388,31 @@ export default function LeadsTable({ API, t, totalLeadsInState }) {
                               <div style={{ fontSize: 10, fontWeight: 700, color: '#22c55e', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>💰 Financials</div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                                 {[
-                                  ['Est. ARV', fmt(lead.arv), '#60a5fa'],
-                                  ['Target Offer', fmt(lead.targetOffer), '#4ade80'],
-                                  ['Est. Profit', fmt(lead.arv && lead.targetOffer ? lead.arv - lead.targetOffer : null), '#f59e0b'],
-                                  ['Equity', `${lead.equity}%`, '#a78bfa'],
+                                  ['Est. ARV',       fmt(lead.arv),                                                    '#60a5fa'],
+                                  ['MAO',            fmt(lead.mao || lead.targetOffer),                                '#4ade80'],
+                                  ['Est. Profit',    fmt(lead.arv && lead.targetOffer ? lead.arv - lead.targetOffer : null), '#f59e0b'],
+                                  ['Equity',         `${lead.equity}%`,                                                '#a78bfa'],
                                 ].map(([l, v, c]) => (
                                   <div key={l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
                                     <span style={{ color: 'var(--dr-text-faint)' }}>{l}</span>
                                     <span style={{ color: c, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>{v}</span>
                                   </div>
                                 ))}
+                                {/* Condition tier */}
+                                {lead.conditionTier && (() => {
+                                  const TIER_CFG = {
+                                    1: { label: 'T1 · Cosmetic Clean', color: '#22c55e' },
+                                    2: { label: 'T2 · Average Fixer',  color: '#fbbf24' },
+                                    3: { label: 'T3 · Total Gut Job',  color: '#f87171' },
+                                  }
+                                  const tc = TIER_CFG[lead.conditionTier]
+                                  return tc ? (
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginTop: 2 }}>
+                                      <span style={{ color: 'var(--dr-text-faint)' }}>Condition</span>
+                                      <span style={{ color: tc.color, fontWeight: 700 }}>{lead.conditionLabel || tc.label}</span>
+                                    </div>
+                                  ) : null
+                                })()}
                               </div>
                             </div>
 

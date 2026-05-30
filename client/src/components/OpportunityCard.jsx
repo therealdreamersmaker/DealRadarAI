@@ -236,6 +236,20 @@ export default function OpportunityCard({ opp, index, t, API = '', source = 'fin
             ? <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 20, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', color: '#4ade80', letterSpacing: '0.06em' }}>● MLS LISTED</span>
             : <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 20, background: 'rgba(250,204,21,0.10)', border: '1px solid rgba(250,204,21,0.25)', color: '#fbbf24', letterSpacing: '0.06em' }}>◆ OFF-MARKET</span>
           }
+          {/* Deal Status badge */}
+          {opp.dealStatus && (() => {
+            const DS_CFG = {
+              'GOLDEN DEAL':               { bg: '#22c55e', color: '#fff', icon: '🏆' },
+              'DEAL SPREAD ACCEPTED':      { bg: '#fbbf24', color: '#1a1a1a', icon: '✅' },
+              'UNPROFITABLE - OVERPRICED': { bg: '#f87171', color: '#fff', icon: '❌' },
+            }
+            const cfg = DS_CFG[opp.dealStatus] || { bg: '#6b7280', color: '#fff', icon: '—' }
+            return (
+              <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: cfg.bg, color: cfg.color, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
+                {cfg.icon} {opp.dealStatus}
+              </span>
+            )
+          })()}
           {isLive && (
             <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', color: '#6ee7b7', letterSpacing: '0.05em' }}>✓ LIVE DATA</span>
           )}
@@ -245,7 +259,7 @@ export default function OpportunityCard({ opp, index, t, API = '', source = 'fin
         </div>
 
         {/* Type badge + deal score on same row */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: style.bg, border: `1px solid ${style.color}44`, borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, color: style.color }}>
             {style.icon} {opp.type}
           </div>
@@ -258,6 +272,23 @@ export default function OpportunityCard({ opp, index, t, API = '', source = 'fin
             <span style={{ fontSize: 9, fontWeight: 700, opacity: 0.85 }}>{ss.label}</span>
           </div>
         </div>
+        {/* Condition tier mini-badge */}
+        {opp.conditionTier && (() => {
+          const TIER_CFG = {
+            1: { label: 'T1 · Cosmetic', color: '#22c55e', bg: 'rgba(34,197,94,0.10)',  border: 'rgba(34,197,94,0.3)'  },
+            2: { label: 'T2 · Avg Fixer', color: '#fbbf24', bg: 'rgba(251,191,36,0.10)', border: 'rgba(251,191,36,0.3)' },
+            3: { label: 'T3 · Gut Job',   color: '#f87171', bg: 'rgba(248,113,113,0.10)',border: 'rgba(248,113,113,0.3)'},
+          }
+          const tc = TIER_CFG[opp.conditionTier]
+          if (!tc) return null
+          return (
+            <div style={{ marginBottom: 8 }}>
+              <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: tc.bg, border: `1px solid ${tc.border}`, color: tc.color, letterSpacing: '0.05em' }}>
+                {tc.label}
+              </span>
+            </div>
+          )
+        })()}
 
         {/* Address */}
         <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--dr-text-1)', marginBottom: 4, lineHeight: 1.4, paddingRight: 80 }}>
@@ -281,10 +312,10 @@ export default function OpportunityCard({ opp, index, t, API = '', source = 'fin
         {/* Financial grid */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
           {[
-            [t('List Price', 'Precio Lista'),         fmt(opp.listPrice),   '#f97316'],
-            [t('ARV', 'Valor ARV'),                   fmt(opp.arv),         '#60a5fa'],
-            [t('Target Offer (70%)', 'Oferta (70%)'), fmt(opp.targetOffer), '#f97316'],
-            [t('Est. Profit', 'Ganancia Est.'),        profit ? fmt(profit) : '—', '#22c55e'],
+            [t('List Price', 'Precio Lista'),             fmt(opp.listPrice),                     '#f97316'],
+            [t('ARV', 'Valor ARV'),                       fmt(opp.arv),                           '#60a5fa'],
+            [t('MAO / Target Offer', 'MAO / Oferta'),     fmt(opp.mao || opp.targetOffer),        '#f97316'],
+            [t('Est. Profit', 'Ganancia Est.'),            profit ? fmt(profit) : '—',             '#22c55e'],
           ].map(([label, val, color]) => (
             <div key={label} style={{ background: 'var(--dr-surface-deep)', borderRadius: 8, padding: '9px 11px' }}>
               <div style={{ fontSize: 10, color: 'var(--dr-text-faint)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 3 }}>{label}</div>
