@@ -92,25 +92,60 @@ async function step1_selectTopZipCodes(configuredMarkets = []) {
 const DEFAULT_DISTRESS_TYPES = ['Foreclosure', 'Tax Delinquency', 'Inherited House'];
 
 function buildAutopilotPropertyPrompt(market, zip, distressTypes) {
-  return `You are a real estate data specialist with deep knowledge of US neighborhoods and distressed property markets.
+  return `You are an elite real estate wholesaling AI executing a strict 5-Phase Deal Underwriting Protocol used by top US flippers and wholesalers.
 
-Generate 10 realistic distressed property profiles for "${market}" (ZIP area ${zip}) for MVP demonstration purposes.
+Generate 10 realistic GENUINELY DISTRESSED property profiles for "${market}" (ZIP area ${zip}) for MVP demonstration purposes.
+
+CRITICAL — every property MUST be genuinely distressed:
+- In POOR or FAIR physical condition: original fixtures, deferred maintenance, outdated systems
+- NEVER renovated, updated, remodeled, move-in ready, or recently improved
+- The "note" must describe BOTH the owner's financial distress AND the property's specific physical condition problems
+
+PHASE 3 — CONDITION TIER CLASSIFICATION (for each property):
+Classify into ONE tier. When borderline, ALWAYS choose the more expensive tier.
+  Tier 1 — Cosmetic Clean (conditionRating 7-9): needs paint, carpet, light landscaping only — repairDiscount = 0.30
+  Tier 2 — Average Fixer (conditionRating 4-6): full kitchen/bath update + one major mechanical (HVAC, roof, electrical, plumbing) — repairDiscount = 0.40
+  Tier 3 — Total Gut Job (conditionRating 1-3): structural damage, mold, fire, or fully abandoned — repairDiscount = 0.50
+repairCostTotal = arv x repairDiscount
+
+PHASE 4 — MAO FINANCIAL ENGINE (calculate for each property):
+Select marketModifier:
+  0.70 — stable/slower markets (default)
+  0.75 — active/liquid metropolitan markets
+  0.80 — hot/high-priced markets with fast absorption
+wholesaleFee = $10,000-$15,000 (scale with deal size)
+mao = (arv x marketModifier) - repairCostTotal - wholesaleFee
+targetOffer = mao
+
+dealStatus (compare estimated seller price / distress value to MAO):
+  "GOLDEN DEAL"               — property appears priced at or below MAO
+  "DEAL SPREAD ACCEPTED"      — property priced within 5% above MAO
+  "UNPROFITABLE - OVERPRICED" — property priced more than 5% above MAO
 
 Return ONLY a raw JSON array of exactly 10 objects — no markdown, no code fences, no commentary:
 [
   {
     "address": "realistic street address in ${market} — use real local street names and neighborhoods (e.g. '2847 Cascade Rd SW, Atlanta, GA 30311')",
     "distressType": "one of: ${distressTypes.join(' | ')}",
-    "arv": number (realistic after-repair value for ${market} housing market),
-    "targetOffer": number (65-70% of ARV),
+    "arv": number,
+    "conditionTier": 1 or 2 or 3,
+    "conditionLabel": "Cosmetic Clean" or "Average Fixer" or "Total Gut Job",
+    "conditionRating": number (1-9 based on tier),
+    "repairDiscount": 0.30 or 0.40 or 0.50,
+    "repairCostTotal": number (arv x repairDiscount),
+    "marketModifier": 0.70 or 0.75 or 0.80,
+    "wholesaleFee": number (10000-15000),
+    "mao": number ((arv x marketModifier) - repairCostTotal - wholesaleFee),
+    "targetOffer": number (= mao),
+    "dealStatus": "GOLDEN DEAL" or "DEAL SPREAD ACCEPTED" or "UNPROFITABLE - OVERPRICED",
     "equity": number (30-70, as a whole-number percent),
-    "dom": number (45-120, days the property has been distressed/listed),
+    "dom": number (45-120),
     "beds": number (2, 3, 4, or 5),
     "baths": number (1, 1.5, 2, 2.5, or 3),
     "sqft": number (900-2800),
     "yearBuilt": number (1945-2005),
-    "note": "1-2 sentences describing the owner situation and why it is a strong wholesale opportunity",
-    "dealScore": number (1-10: wholesale opportunity rating. 10=screaming deal, 7-9=strong, 5-6=solid, 3-4=average, 1-2=pass. Base on: equity %, distress urgency, DOM, and price vs ARV)
+    "note": "2 sentences: specific owner financial distress situation AND specific physical condition problems",
+    "dealScore": number (1-10)
   }
 ]
 
@@ -118,9 +153,10 @@ Rules:
 - Spread distressType across ALL provided types: ${distressTypes.join(', ')}
 - Use actual neighborhood names and realistic street patterns for ${market}
 - ARV must reflect real ${market} housing prices (research your training data)
-- targetOffer = 65-70% of ARV (round to nearest $1,000)
+- mao = (arv x marketModifier) - repairCostTotal - wholesaleFee (exact formula)
+- targetOffer = mao (always equal to MAO)
 - Do NOT use generic street names like "Oak Ave" or "Maple St" — use streets real to ${market}
-- Return ONLY the JSON array with no surrounding text.`;
+- Return ONLY the JSON array with no surrounding text.\`;
 }
 
 function buildFallbackProperties(zipInfo, distressTypes, count) {
@@ -129,21 +165,54 @@ function buildFallbackProperties(zipInfo, distressTypes, count) {
   for (let i = 0; i < count; i++) {
     const distress = distressTypes[i % distressTypes.length];
     const arv = 130000 + Math.floor(Math.random() * 220000);
+    const yearBuilt = 1952 + Math.floor(Math.random() * 53);
+    const equity = 30 + Math.floor(Math.random() * 35);
+
+    // Phase 3: derive conditionTier from yearBuilt
+    let conditionTier, repairDiscount, conditionLabel, conditionRating;
+    if (yearBuilt < 1965) {
+      conditionTier = 3; repairDiscount = 0.50; conditionLabel = 'Total Gut Job'; conditionRating = 2;
+    } else if (yearBuilt < 1985) {
+      conditionTier = 2; repairDiscount = 0.40; conditionLabel = 'Average Fixer'; conditionRating = 5;
+    } else {
+      conditionTier = 1; repairDiscount = 0.30; conditionLabel = 'Cosmetic Clean'; conditionRating = 7;
+    }
+
+    // Phase 4: MAO formula
+    const repairCostTotal = Math.round(arv * repairDiscount);
+    const marketModifier  = 0.70;
+    const wholesaleFee    = 12000;
+    const mao             = Math.round((arv * marketModifier) - repairCostTotal - wholesaleFee);
+
+    let dealStatus;
+    if (equity >= 35)      dealStatus = 'GOLDEN DEAL';
+    else if (equity >= 25) dealStatus = 'DEAL SPREAD ACCEPTED';
+    else                   dealStatus = 'UNPROFITABLE - OVERPRICED';
+
     props.push({
       id: uuidv4(),
       address: `${1000 + Math.floor(Math.random() * 8000)} Main St`,
-      city: zipInfo.city.split(',')[0],
-      state: zipInfo.city.split(', ')[1],
-      zip: zipInfo.zip,
+      city:    zipInfo.city.split(',')[0],
+      state:   zipInfo.city.split(', ')[1],
+      zip:     zipInfo.zip,
       distressType: distress,
       arv,
-      targetOffer: Math.round(arv * 0.68),
-      equity: 30 + Math.floor(Math.random() * 35),
+      conditionTier,
+      conditionLabel,
+      conditionRating,
+      repairDiscount,
+      repairCostTotal,
+      marketModifier,
+      wholesaleFee,
+      mao,
+      targetOffer: mao,
+      dealStatus,
+      equity,
       dom: zipInfo.dom + Math.floor(Math.random() * 20) - 10,
       beds: [2, 3, 3, 4][i % 4],
       baths: [1, 2, 2, 3][i % 4],
       sqft: 950 + Math.floor(Math.random() * 1200),
-      yearBuilt: 1952 + Math.floor(Math.random() * 53),
+      yearBuilt,
       note: `AI-estimated ${distress} property in ${zipInfo.city}.`,
       dataSource: 'ai-estimate',
     });
@@ -171,24 +240,35 @@ async function step2_extractDistressedProperties(zipCodes, selectedNiches = []) 
       const parsed = JSON.parse(cleaned.slice(start, end + 1));
 
       for (const p of parsed) {
+        const arv         = Number(p.arv)         || 180000;
+        const mao         = Number(p.mao)         || Math.round(arv * 0.68);
         properties.push({
-          id:          uuidv4(),
-          address:     p.address     || `${Math.floor(Math.random() * 8000) + 1000} Main St`,
-          city:        market.split(',')[0],
-          state:       market.split(', ')[1] || '',
-          zip:         zipInfo.zip,
-          distressType: p.distressType || distressTypes[0],
-          arv:         Number(p.arv)         || 180000,
-          targetOffer: Number(p.targetOffer) || 126000,
-          equity:      Number(p.equity)      || 35,
-          dom:         Number(p.dom)         || zipInfo.dom,
-          beds:        Number(p.beds)        || 3,
-          baths:       Number(p.baths)       || 2,
-          sqft:        Number(p.sqft)        || 1400,
-          yearBuilt:   Number(p.yearBuilt)   || 1975,
-          note:        p.note || '',
-          dealScore:   Number(p.dealScore)  || 6,
-          dataSource:  'ai-estimate',
+          id:             uuidv4(),
+          address:        p.address     || `${Math.floor(Math.random() * 8000) + 1000} Main St`,
+          city:           market.split(',')[0],
+          state:          market.split(', ')[1] || '',
+          zip:            zipInfo.zip,
+          distressType:   p.distressType    || distressTypes[0],
+          arv,
+          conditionTier:  Number(p.conditionTier)  || 2,
+          conditionLabel: p.conditionLabel          || 'Average Fixer',
+          conditionRating:Number(p.conditionRating) || 5,
+          repairDiscount: Number(p.repairDiscount)  || 0.40,
+          repairCostTotal:Number(p.repairCostTotal) || Math.round(arv * 0.40),
+          marketModifier: Number(p.marketModifier)  || 0.70,
+          wholesaleFee:   Number(p.wholesaleFee)    || 12000,
+          mao,
+          targetOffer:    mao,
+          dealStatus:     p.dealStatus              || 'DEAL SPREAD ACCEPTED',
+          equity:         Number(p.equity)          || 35,
+          dom:            Number(p.dom)             || zipInfo.dom,
+          beds:           Number(p.beds)            || 3,
+          baths:          Number(p.baths)           || 2,
+          sqft:           Number(p.sqft)            || 1400,
+          yearBuilt:      Number(p.yearBuilt)       || 1975,
+          note:           p.note                    || '',
+          dealScore:      Number(p.dealScore)       || 6,
+          dataSource:     'ai-estimate',
         });
       }
       addLog(`✓ Generated ${parsed.length} AI property profiles for ${market}`);
