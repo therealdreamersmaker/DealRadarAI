@@ -7,6 +7,7 @@ const NAV_MAIN = [
   { id: 'analyzer',   icon: '🔬', label: 'Deal Analyzer',     labelEs: 'Analizador de Tratos' },
   { id: 'autopilot',  icon: '⚡', label: 'Autopilot Hunter',  labelEs: 'Cazador Autopiloto' },
   { id: 'saved',      icon: '💾', label: 'Deal Bank',         labelEs: 'Banco de Tratos' },
+  { id: 'csv',        icon: '📂', label: 'CSV Import',        labelEs: 'Importar CSV' },
 ]
 const NAV_BOTTOM = [
   { id: 'settings',   icon: '⚙',  label: 'Settings',         labelEs: 'Configuración' },

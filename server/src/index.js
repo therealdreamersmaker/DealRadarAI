@@ -12,6 +12,7 @@ const { runAutopilot, getState, getLeads, EXPORTS_DIR } = require('./autopilot')
 const { hasRentcast } = require('./listingsService');
 const { generateScripts, generateMemo } = require('./aiTools');
 const { analyzeProperty } = require('./propertyAnalyzer');
+const { importCSV } = require('./csvImportService');
 
 const app = express();
 app.use(cors());
@@ -106,6 +107,19 @@ app.post('/api/ai-tools/memo', async (req, res) => {
   } catch (err) {
     console.error('[/api/ai-tools/memo]', err.message);
     res.status(500).json({ error: err.message || 'Memo generation failed' });
+  }
+});
+
+// ── CSV Import — BatchLeads export → 5-Phase underwriting ────────────────────
+app.post('/api/import-csv', (req, res) => {
+  const { csvContent } = req.body;
+  if (!csvContent) return res.status(400).json({ error: 'csvContent is required' });
+  try {
+    const leads = importCSV(csvContent);
+    res.json({ leads, count: leads.length });
+  } catch (err) {
+    console.error('[/api/import-csv]', err.message);
+    res.status(400).json({ error: err.message || 'CSV parse failed' });
   }
 });
 

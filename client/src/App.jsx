@@ -11,6 +11,7 @@ import ProfilePage from './components/ProfilePage'
 import FinderSettings, { useFinderSettings, filterOpportunities } from './components/FinderSettings'
 import DealAnalyzer from './components/DealAnalyzer'
 import SavedDeals from './components/SavedDeals'
+import CSVImport from './components/CSVImport'
 
 const API = import.meta.env.VITE_API_URL || ''
 
@@ -302,6 +303,24 @@ export default function App() {
                 sub={t('Your saved deals from all tools — search, filter, and add notes', 'Tus tratos guardados de todas las herramientas — busca, filtra y agrega notas')}
               />
               <SavedDeals t={t} API={API} />
+            </motion.div>
+          )}
+
+          {/* ── CSV Import ─────────────────────────────────────── */}
+          {activePage === 'csv' && (
+            <motion.div
+              key="csv"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              style={{ width: '100%', minWidth: 0, padding: '28px 32px 48px', boxSizing: 'border-box' }}
+            >
+              <PageTitle
+                icon="📂"
+                title={t('CSV Import', 'Importar CSV')}
+                sub={t('Drop a BatchLeads export and get instant 5-Phase underwriting on every property', 'Importa tu lista de BatchLeads y obtén análisis instantáneo de cada propiedad')}
+              />
+              <CSVImport API={API} t={t} />
             </motion.div>
           )}
 
