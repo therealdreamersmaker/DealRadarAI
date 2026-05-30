@@ -156,7 +156,7 @@ Rules:
 - mao = (arv x marketModifier) - repairCostTotal - wholesaleFee (exact formula)
 - targetOffer = mao (always equal to MAO)
 - Do NOT use generic street names like "Oak Ave" or "Maple St" — use streets real to ${market}
-- Return ONLY the JSON array with no surrounding text.\`;
+- Return ONLY the JSON array with no surrounding text.`;
 }
 
 function buildFallbackProperties(zipInfo, distressTypes, count) {
