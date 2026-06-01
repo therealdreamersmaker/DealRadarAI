@@ -160,6 +160,30 @@ Rules:
 - Return ONLY the JSON array with no surrounding text.`;
 }
 
+function determineTierAutopilot(yearBuilt, listPrice, arv, distressType) {
+  const type = (distressType || '').toLowerCase();
+  if (/fire|flood|structural|mold|condemned|abandon/.test(type)) {
+    return { conditionTier: 3, repairDiscount: 0.50, conditionLabel: 'Total Gut Job', conditionRating: 2 };
+  }
+  let score;
+  if (yearBuilt < 1960)      score = 2;
+  else if (yearBuilt < 1985) score = 1;
+  else                       score = 0;
+  if (arv > 0 && listPrice > 0) {
+    const ratio = listPrice / arv;
+    if (ratio >= 0.85)     score -= 1;
+    else if (ratio < 0.55) score += 1;
+  }
+  if (/reloc|divorce|inherit|estate|probate|high.?equity/.test(type)) score -= 1;
+  else if (/foreclos|bank.?own|reo|tax.?delin/.test(type)) score += 1;
+  const TIERS = [
+    { conditionTier: 1, repairDiscount: 0.30, conditionLabel: 'Cosmetic Clean', conditionRating: 8 },
+    { conditionTier: 2, repairDiscount: 0.40, conditionLabel: 'Average Fixer',  conditionRating: 5 },
+    { conditionTier: 3, repairDiscount: 0.50, conditionLabel: 'Total Gut Job',  conditionRating: 2 },
+  ];
+  return TIERS[Math.max(0, Math.min(2, score))];
+}
+
 function buildFallbackProperties(zipInfo, distressTypes, count) {
   // Fallback when AI call fails — honest about being a fallback
   const props = [];
@@ -169,15 +193,10 @@ function buildFallbackProperties(zipInfo, distressTypes, count) {
     const yearBuilt = 1952 + Math.floor(Math.random() * 53);
     const equity = 30 + Math.floor(Math.random() * 35);
 
-    // Phase 3: derive conditionTier from yearBuilt
-    let conditionTier, repairDiscount, conditionLabel, conditionRating;
-    if (yearBuilt < 1965) {
-      conditionTier = 3; repairDiscount = 0.50; conditionLabel = 'Total Gut Job'; conditionRating = 2;
-    } else if (yearBuilt < 1985) {
-      conditionTier = 2; repairDiscount = 0.40; conditionLabel = 'Average Fixer'; conditionRating = 5;
-    } else {
-      conditionTier = 1; repairDiscount = 0.30; conditionLabel = 'Cosmetic Clean'; conditionRating = 7;
-    }
+    // Phase 3: multi-factor tier (year built + distress type for fallback)
+    const estListPrice  = Math.round(arv * (0.65 + Math.random() * 0.15)); // 65–80% ARV fallback
+    const tierResult    = determineTierAutopilot(yearBuilt, estListPrice, arv, distress);
+    const { conditionTier, repairDiscount, conditionLabel, conditionRating } = tierResult;
 
     // Phase 4: MAO formula
     const repairCostTotal = Math.round(arv * repairDiscount);

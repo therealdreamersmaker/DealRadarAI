@@ -19,15 +19,54 @@ function num(val, fallback = null) {
   return isNaN(n) ? fallback : n;
 }
 
-function computePhase3And4(arv, yearBuilt) {
-  let conditionTier, repairDiscount, conditionLabel, conditionRating;
-  if (yearBuilt < 1960) {
-    conditionTier = 3; repairDiscount = 0.50; conditionLabel = 'Total Gut Job'; conditionRating = 2;
-  } else if (yearBuilt < 1985) {
-    conditionTier = 2; repairDiscount = 0.40; conditionLabel = 'Average Fixer'; conditionRating = 5;
-  } else {
-    conditionTier = 1; repairDiscount = 0.30; conditionLabel = 'Cosmetic Clean'; conditionRating = 7;
+/**
+ * Multi-factor condition tier — three signals weighted together:
+ *   1. Year built        → baseline risk
+ *   2. List/ARV ratio    → strongest real-world condition proxy
+ *   3. Distress type     → financial stress ≠ physical damage
+ *
+ * Physical-damage keywords (fire, flood, mold, structural) override
+ * everything else and lock the property at T3.
+ */
+function determineTier(yearBuilt, listPrice, arv, distressType) {
+  const type = (distressType || '').toLowerCase();
+
+  // Hard override — physical damage always means gut job regardless of price
+  if (/fire|flood|structural|mold|condemned|abandon/.test(type)) {
+    return { conditionTier: 3, repairDiscount: 0.50, conditionLabel: 'Total Gut Job', conditionRating: 2 };
   }
+
+  // Baseline from year built (score: 0=T1, 1=T2, 2=T3)
+  let score;
+  if (yearBuilt < 1960)      score = 2;
+  else if (yearBuilt < 1985) score = 1;
+  else                       score = 0;
+
+  // List/ARV ratio — the single best proxy for physical condition in CSV data
+  if (arv > 0 && listPrice > 0) {
+    const ratio = listPrice / arv;
+    if (ratio >= 0.85)     score -= 1; // priced near full value → seller knows it's in good shape
+    else if (ratio < 0.55) score += 1; // deeply discounted → likely serious problems
+  }
+
+  // Distress type: does the seller's problem indicate financial vs physical neglect?
+  if (/reloc|divorce|inherit|estate|probate|high.?equity|job loss/.test(type)) {
+    score -= 1; // motivated seller, house is likely maintained — reduce tier
+  } else if (/foreclos|bank.?own|reo|tax.?delin/.test(type)) {
+    score += 1; // delinquent owners often can't afford maintenance either
+  }
+
+  const TIERS = [
+    { conditionTier: 1, repairDiscount: 0.30, conditionLabel: 'Cosmetic Clean', conditionRating: 8 },
+    { conditionTier: 2, repairDiscount: 0.40, conditionLabel: 'Average Fixer',  conditionRating: 5 },
+    { conditionTier: 3, repairDiscount: 0.50, conditionLabel: 'Total Gut Job',  conditionRating: 2 },
+  ];
+  return TIERS[Math.max(0, Math.min(2, score))];
+}
+
+function computePhase3And4(arv, yearBuilt, listPrice, distressType) {
+  const tier = determineTier(yearBuilt, listPrice, arv, distressType);
+  const { conditionTier, repairDiscount, conditionLabel, conditionRating } = tier;
   const repairCostTotal = Math.round(arv * repairDiscount);
   const marketModifier  = 0.70;
   const wholesaleFee    = 12000;
@@ -83,7 +122,7 @@ function mapRow(raw) {
 
   const distressType = col(raw, 'Lead Type', 'Distress Type', 'Tag', 'Category', 'List Type') || 'Absentee Owner';
 
-  const phase = computePhase3And4(arv, yearBuilt);
+  const phase = computePhase3And4(arv, yearBuilt, listPrice, distressType);
   const dealStatus = computeDealStatus(listPrice || arv * 0.75, phase.mao);
 
   const lead = {

@@ -104,22 +104,42 @@ function wholesaleScore(listing) {
  * Derives condition tier from yearBuilt + price/sqft signals,
  * then calculates MAO using the exact 5-Phase formula.
  */
-function computeConditionAndMao(listing, arv, listPrice) {
-  const yearBuilt = listing.yearBuilt || 1980;
-  const ppsf      = listing.squareFootage ? listPrice / listing.squareFootage : 999;
-
-  // Phase 3 — Condition Tier
-  let conditionTier, repairDiscount, conditionLabel, conditionRating;
-  if (yearBuilt < 1960 || ppsf < 50) {
-    conditionTier  = 3; repairDiscount = 0.50;
-    conditionLabel = 'Total Gut Job'; conditionRating = 2;
-  } else if (yearBuilt < 1985 && ppsf < 110) {
-    conditionTier  = 2; repairDiscount = 0.40;
-    conditionLabel = 'Average Fixer'; conditionRating = 5;
-  } else {
-    conditionTier  = 1; repairDiscount = 0.30;
-    conditionLabel = 'Cosmetic Clean'; conditionRating = 7;
+/**
+ * Multi-factor condition tier shared with csvImportService.
+ * Three signals: year built (baseline) + list/ARV ratio (condition proxy)
+ * + distress/listing type (financial vs physical distress).
+ */
+function determineTier(yearBuilt, listPrice, arv, distressType) {
+  const type = (distressType || '').toLowerCase();
+  if (/fire|flood|structural|mold|condemned|abandon/.test(type)) {
+    return { conditionTier: 3, repairDiscount: 0.50, conditionLabel: 'Total Gut Job', conditionRating: 2 };
   }
+  let score;
+  if (yearBuilt < 1960)      score = 2;
+  else if (yearBuilt < 1985) score = 1;
+  else                       score = 0;
+  if (arv > 0 && listPrice > 0) {
+    const ratio = listPrice / arv;
+    if (ratio >= 0.85)     score -= 1;
+    else if (ratio < 0.55) score += 1;
+  }
+  if (/reloc|divorce|inherit|estate|probate|high.?equity|job loss/.test(type)) score -= 1;
+  else if (/foreclos|bank.?own|reo|tax.?delin/.test(type)) score += 1;
+  const TIERS = [
+    { conditionTier: 1, repairDiscount: 0.30, conditionLabel: 'Cosmetic Clean', conditionRating: 8 },
+    { conditionTier: 2, repairDiscount: 0.40, conditionLabel: 'Average Fixer',  conditionRating: 5 },
+    { conditionTier: 3, repairDiscount: 0.50, conditionLabel: 'Total Gut Job',  conditionRating: 2 },
+  ];
+  return TIERS[Math.max(0, Math.min(2, score))];
+}
+
+function computeConditionAndMao(listing, arv, listPrice) {
+  const yearBuilt    = listing.yearBuilt || 1980;
+  const distressType = listing.propertyType || listing.listingType || '';
+
+  // Phase 3 — multi-factor tier (year + price ratio + distress type)
+  const { conditionTier, repairDiscount, conditionLabel, conditionRating } =
+    determineTier(yearBuilt, listPrice, arv, distressType);
 
   // Phase 4 — MAO Formula
   const marketModifier  = 0.70; // RentCast markets default to stable
