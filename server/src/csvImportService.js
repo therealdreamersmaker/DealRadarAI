@@ -116,7 +116,8 @@ function mapRow(raw) {
 }
 
 function importCSV(csvContent) {
-  const workbook = XLSX.read(csvContent, { type: 'string' });
+  // csvContent is always base64-encoded (handles CSV text and Excel binary equally)
+  const workbook = XLSX.read(csvContent, { type: 'base64' });
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) throw new Error('No worksheet found in file');
   const sheet = workbook.Sheets[sheetName];

@@ -350,11 +350,21 @@ export default function CSVImport({ API, t }) {
     setFileName(file.name);
     setLoading(true);
     try {
-      const text = await file.text();
-      const res  = await fetch(`${API}/api/import-csv`, {
+      // Read as ArrayBuffer → base64 so both CSV text and Excel binary files
+      // are sent as valid JSON without encoding corruption or body-parse crashes.
+      const buffer = await file.arrayBuffer();
+      const bytes  = new Uint8Array(buffer);
+      let binary = '';
+      const CHUNK = 8192;
+      for (let i = 0; i < bytes.length; i += CHUNK) {
+        binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + CHUNK, bytes.length)));
+      }
+      const base64 = btoa(binary);
+
+      const res = await fetch(`${API}/api/import-csv`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ csvContent: text }),
+        body: JSON.stringify({ csvContent: base64 }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Import failed');
