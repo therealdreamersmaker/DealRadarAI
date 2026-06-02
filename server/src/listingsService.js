@@ -112,7 +112,7 @@ function wholesaleScore(listing) {
 function determineTier(yearBuilt, listPrice, arv, distressType) {
   const type = (distressType || '').toLowerCase();
   if (/fire|flood|structural|mold|condemned|abandon/.test(type)) {
-    return { conditionTier: 3, repairDiscount: 0.50, conditionLabel: 'Total Gut Job', conditionRating: 2 };
+    return { conditionTier: 3, conditionLabel: 'Total Gut Job', conditionRating: 2 };
   }
   let score;
   if (yearBuilt < 1960)      score = 2;
@@ -126,25 +126,39 @@ function determineTier(yearBuilt, listPrice, arv, distressType) {
   if (/reloc|divorce|inherit|estate|probate|high.?equity|job loss/.test(type)) score -= 1;
   else if (/foreclos|bank.?own|reo|tax.?delin/.test(type)) score += 1;
   const TIERS = [
-    { conditionTier: 1, repairDiscount: 0.30, conditionLabel: 'Cosmetic Clean', conditionRating: 8 },
-    { conditionTier: 2, repairDiscount: 0.40, conditionLabel: 'Average Fixer',  conditionRating: 5 },
-    { conditionTier: 3, repairDiscount: 0.50, conditionLabel: 'Total Gut Job',  conditionRating: 2 },
+    { conditionTier: 1, conditionLabel: 'Cosmetic Clean', conditionRating: 8 },
+    { conditionTier: 2, conditionLabel: 'Average Fixer',  conditionRating: 5 },
+    { conditionTier: 3, conditionLabel: 'Total Gut Job',  conditionRating: 2 },
   ];
   return TIERS[Math.max(0, Math.min(2, score))];
 }
 
+// Cost/sqft repair estimate with local labor adjustment (see csvImportService for full notes)
+function estimateRepairCost(conditionTier, sqft, arv) {
+  const COST_PER_SQFT = { 1: 18, 2: 38, 3: 65 };
+  if (sqft && sqft >= 600) {
+    const arvPsf    = arv / sqft;
+    const laborMult = arvPsf > 300 ? 1.30 : arvPsf > 200 ? 1.15 : arvPsf > 100 ? 1.00 : 0.88;
+    return Math.round(sqft * COST_PER_SQFT[conditionTier] * laborMult);
+  }
+  const PCT_FALLBACK = { 1: 0.12, 2: 0.22, 3: 0.38 };
+  return Math.round(arv * PCT_FALLBACK[conditionTier]);
+}
+
 function computeConditionAndMao(listing, arv, listPrice) {
   const yearBuilt    = listing.yearBuilt || 1980;
+  const sqft         = listing.squareFootage || listing.sqft || 0;
   const distressType = listing.propertyType || listing.listingType || '';
 
   // Phase 3 — multi-factor tier (year + price ratio + distress type)
-  const { conditionTier, repairDiscount, conditionLabel, conditionRating } =
+  const { conditionTier, conditionLabel, conditionRating } =
     determineTier(yearBuilt, listPrice, arv, distressType);
 
-  // Phase 4 — MAO Formula
-  const marketModifier  = 0.70; // RentCast markets default to stable
+  // Phase 4 — MAO Formula with sqft-based repair cost
+  const marketModifier  = 0.70;
   const wholesaleFee    = 12000;
-  const repairCostTotal = Math.round(arv * repairDiscount);
+  const repairCostTotal = estimateRepairCost(conditionTier, sqft, arv);
+  const repairDiscount  = arv > 0 ? Math.round((repairCostTotal / arv) * 100) / 100 : 0;
   const mao             = Math.round((arv * marketModifier) - repairCostTotal - wholesaleFee);
 
   let dealStatus;

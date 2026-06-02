@@ -163,7 +163,7 @@ Rules:
 function determineTierAutopilot(yearBuilt, listPrice, arv, distressType) {
   const type = (distressType || '').toLowerCase();
   if (/fire|flood|structural|mold|condemned|abandon/.test(type)) {
-    return { conditionTier: 3, repairDiscount: 0.50, conditionLabel: 'Total Gut Job', conditionRating: 2 };
+    return { conditionTier: 3, conditionLabel: 'Total Gut Job', conditionRating: 2 };
   }
   let score;
   if (yearBuilt < 1960)      score = 2;
@@ -177,11 +177,22 @@ function determineTierAutopilot(yearBuilt, listPrice, arv, distressType) {
   if (/reloc|divorce|inherit|estate|probate|high.?equity/.test(type)) score -= 1;
   else if (/foreclos|bank.?own|reo|tax.?delin/.test(type)) score += 1;
   const TIERS = [
-    { conditionTier: 1, repairDiscount: 0.30, conditionLabel: 'Cosmetic Clean', conditionRating: 8 },
-    { conditionTier: 2, repairDiscount: 0.40, conditionLabel: 'Average Fixer',  conditionRating: 5 },
-    { conditionTier: 3, repairDiscount: 0.50, conditionLabel: 'Total Gut Job',  conditionRating: 2 },
+    { conditionTier: 1, conditionLabel: 'Cosmetic Clean', conditionRating: 8 },
+    { conditionTier: 2, conditionLabel: 'Average Fixer',  conditionRating: 5 },
+    { conditionTier: 3, conditionLabel: 'Total Gut Job',  conditionRating: 2 },
   ];
   return TIERS[Math.max(0, Math.min(2, score))];
+}
+
+function estimateRepairCostAutopilot(conditionTier, sqft, arv) {
+  const COST_PER_SQFT = { 1: 18, 2: 38, 3: 65 };
+  if (sqft && sqft >= 600) {
+    const arvPsf    = arv / sqft;
+    const laborMult = arvPsf > 300 ? 1.30 : arvPsf > 200 ? 1.15 : arvPsf > 100 ? 1.00 : 0.88;
+    return Math.round(sqft * COST_PER_SQFT[conditionTier] * laborMult);
+  }
+  const PCT_FALLBACK = { 1: 0.12, 2: 0.22, 3: 0.38 };
+  return Math.round(arv * PCT_FALLBACK[conditionTier]);
 }
 
 function buildFallbackProperties(zipInfo, distressTypes, count) {
@@ -195,11 +206,13 @@ function buildFallbackProperties(zipInfo, distressTypes, count) {
 
     // Phase 3: multi-factor tier (year built + distress type for fallback)
     const estListPrice  = Math.round(arv * (0.65 + Math.random() * 0.15)); // 65–80% ARV fallback
+    const sqft          = 950 + Math.floor(Math.random() * 1200);
     const tierResult    = determineTierAutopilot(yearBuilt, estListPrice, arv, distress);
-    const { conditionTier, repairDiscount, conditionLabel, conditionRating } = tierResult;
+    const { conditionTier, conditionLabel, conditionRating } = tierResult;
 
-    // Phase 4: MAO formula
-    const repairCostTotal = Math.round(arv * repairDiscount);
+    // Phase 4: sqft-based repair cost + MAO formula
+    const repairCostTotal = estimateRepairCostAutopilot(conditionTier, sqft, arv);
+    const repairDiscount  = arv > 0 ? Math.round((repairCostTotal / arv) * 100) / 100 : 0;
     const marketModifier  = 0.70;
     const wholesaleFee    = 12000;
     const mao             = Math.round((arv * marketModifier) - repairCostTotal - wholesaleFee);
@@ -231,7 +244,7 @@ function buildFallbackProperties(zipInfo, distressTypes, count) {
       dom: zipInfo.dom + Math.floor(Math.random() * 20) - 10,
       beds: [2, 3, 3, 4][i % 4],
       baths: [1, 2, 2, 3][i % 4],
-      sqft: 950 + Math.floor(Math.random() * 1200),
+      sqft,
       yearBuilt,
       note: `AI-estimated ${distress} property in ${zipInfo.city}.`,
       dataSource: 'ai-estimate',

@@ -57,21 +57,51 @@ function determineTier(yearBuilt, listPrice, arv, distressType) {
   }
 
   const TIERS = [
-    { conditionTier: 1, repairDiscount: 0.30, conditionLabel: 'Cosmetic Clean', conditionRating: 8 },
-    { conditionTier: 2, repairDiscount: 0.40, conditionLabel: 'Average Fixer',  conditionRating: 5 },
-    { conditionTier: 3, repairDiscount: 0.50, conditionLabel: 'Total Gut Job',  conditionRating: 2 },
+    { conditionTier: 1, conditionLabel: 'Cosmetic Clean', conditionRating: 8 },
+    { conditionTier: 2, conditionLabel: 'Average Fixer',  conditionRating: 5 },
+    { conditionTier: 3, conditionLabel: 'Total Gut Job',  conditionRating: 2 },
   ];
   return TIERS[Math.max(0, Math.min(2, score))];
 }
 
-function computePhase3And4(arv, yearBuilt, listPrice, distressType) {
-  const tier = determineTier(yearBuilt, listPrice, arv, distressType);
-  const { conditionTier, repairDiscount, conditionLabel, conditionRating } = tier;
-  const repairCostTotal = Math.round(arv * repairDiscount);
+/**
+ * Repair cost based on square footage × cost-per-sqft, adjusted for local
+ * labor costs (approximated from ARV/sqft as a market proxy).
+ *
+ * Base rates (national average, 2024):
+ *   T1 Cosmetic   ~$18/sqft  (paint, carpet, fixtures, landscaping)
+ *   T2 Avg Fixer  ~$38/sqft  (kitchen + bath + one major mechanical)
+ *   T3 Gut Job    ~$65/sqft  (full gut, structural, all mechanicals)
+ *
+ * Labor multiplier by market:
+ *   ARV/sqft > $300  → 1.30× (NYC, SF premium labor)
+ *   ARV/sqft > $200  → 1.15× (Miami, Denver, Seattle)
+ *   ARV/sqft > $100  → 1.00× (standard US markets)
+ *   ARV/sqft ≤ $100  → 0.88× (lower-cost rural/secondary markets)
+ *
+ * Falls back to % of ARV only when sqft is unavailable.
+ */
+function estimateRepairCost(conditionTier, sqft, arv) {
+  const COST_PER_SQFT = { 1: 18, 2: 38, 3: 65 };
+  if (sqft && sqft >= 600) {
+    const arvPsf    = arv / sqft;
+    const laborMult = arvPsf > 300 ? 1.30 : arvPsf > 200 ? 1.15 : arvPsf > 100 ? 1.00 : 0.88;
+    return Math.round(sqft * COST_PER_SQFT[conditionTier] * laborMult);
+  }
+  // Fallback: % of ARV when sqft is unknown
+  const PCT_FALLBACK = { 1: 0.12, 2: 0.22, 3: 0.38 };
+  return Math.round(arv * PCT_FALLBACK[conditionTier]);
+}
+
+function computePhase3And4(arv, yearBuilt, listPrice, distressType, sqft) {
+  const { conditionTier, conditionLabel, conditionRating } =
+    determineTier(yearBuilt, listPrice, arv, distressType);
+  const repairCostTotal = estimateRepairCost(conditionTier, sqft, arv);
+  const repairDiscount  = arv > 0 ? Math.round((repairCostTotal / arv) * 100) / 100 : 0;
   const marketModifier  = 0.70;
   const wholesaleFee    = 12000;
   const mao             = Math.round((arv * marketModifier) - repairCostTotal - wholesaleFee);
-  return { conditionTier, repairDiscount, conditionLabel, conditionRating, repairCostTotal, marketModifier, wholesaleFee, mao };
+  return { conditionTier, conditionLabel, conditionRating, repairDiscount, repairCostTotal, marketModifier, wholesaleFee, mao };
 }
 
 function computeDealStatus(listPrice, mao) {
@@ -122,7 +152,7 @@ function mapRow(raw) {
 
   const distressType = col(raw, 'Lead Type', 'Distress Type', 'Tag', 'Category', 'List Type') || 'Absentee Owner';
 
-  const phase = computePhase3And4(arv, yearBuilt, listPrice, distressType);
+  const phase = computePhase3And4(arv, yearBuilt, listPrice, distressType, sqft);
   const dealStatus = computeDealStatus(listPrice || arv * 0.75, phase.mao);
 
   const lead = {
