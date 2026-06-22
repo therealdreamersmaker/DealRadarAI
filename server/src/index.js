@@ -218,21 +218,29 @@ app.get('/api/autopilot/download/:filename', (req, res) => {
   res.download(filepath, safe);
 });
 
-// Daily cron at 6:00 AM
-cron.schedule('0 6 * * *', () => {
-  console.log('[CRON] Daily Autopilot Deal Hunter triggered at', new Date().toISOString());
-  const state = getState();
-  state.nextRun = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-  runAutopilot().catch(console.error);
-});
+// Auto-cron is OFF by default to protect API quotas (RentCast, Gemini).
+// Set AUTOPILOT_AUTO_RUN=true in Railway environment variables to enable.
+if (process.env.AUTOPILOT_AUTO_RUN === 'true') {
+  cron.schedule('0 6 * * *', () => {
+    console.log('[CRON] Daily Autopilot triggered at', new Date().toISOString());
+    const state = getState();
+    state.nextRun = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    runAutopilot().catch(console.error);
+  });
+  console.log('[CRON] Daily Autopilot scheduled at 6:00 AM (AUTOPILOT_AUTO_RUN=true)');
+} else {
+  console.log('[CRON] Auto-run disabled — set AUTOPILOT_AUTO_RUN=true to enable daily runs');
+}
 
-// Set initial nextRun
+// Set initial nextRun display value
 const autopilotState = getState();
 const now = new Date();
 const nextRun = new Date(now);
 nextRun.setDate(nextRun.getDate() + 1);
 nextRun.setHours(6, 0, 0, 0);
-autopilotState.nextRun = nextRun.toISOString();
+autopilotState.nextRun = process.env.AUTOPILOT_AUTO_RUN === 'true'
+  ? nextRun.toISOString()
+  : null;
 
 // SPA fallback
 if (fs.existsSync(PUBLIC_DIR)) {

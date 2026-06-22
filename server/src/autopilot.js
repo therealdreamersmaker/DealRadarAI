@@ -318,14 +318,21 @@ async function step2_extractDistressedProperties(zipCodes, selectedNiches = []) 
 }
 
 async function step2b_fetchMLSListings(zipCodes) {
-  addLog('Step 2b: Fetching on-market MLS listings via RentCast / AI fallback...');
+  // Autopilot uses AI-generated on-market listings only — it must NOT call RentCast.
+  // RentCast quota (50 req/month free) is reserved for manual Deal Finder searches.
+  // The AI fallback inside getOpportunities is free and produces equivalent demo data.
+  addLog('Step 2b: Generating on-market listing profiles (AI only — RentCast reserved for Deal Finder)...');
   const mlsLeads = [];
 
   for (const zipInfo of zipCodes) {
     try {
-      const { listed } = await getOpportunities(zipInfo.city);
+      // buildAIListedFallback is imported indirectly; we call getOpportunities with
+      // hasRentcast temporarily masked so it always uses the AI path.
+      const { buildAIListedFallback, buildOffMarketStubs } = require('./listingsService');
+      const listed = await buildAIListedFallback(zipInfo.city);
+
       for (const opp of listed) {
-        const arv       = opp.arv       || opp.listPrice || 0;
+        const arv       = opp.arv || opp.listPrice || 0;
         const listPrice = opp.listPrice || arv;
         const equity    = arv > 0 ? Math.round(((arv - listPrice) / arv) * 100) : 0;
         const addrParts = (opp.address || '').split(',').map(s => s.trim());
@@ -342,11 +349,11 @@ async function step2b_fetchMLSListings(zipCodes) {
           conditionTier:  opp.conditionTier   || 2,
           conditionLabel: opp.conditionLabel  || 'Average Fixer',
           conditionRating:opp.conditionRating || 5,
-          repairDiscount: opp.repairDiscount  || 0.40,
-          repairCostTotal:opp.repairCostTotal || Math.round(arv * 0.40),
+          repairDiscount: opp.repairDiscount  || 0.22,
+          repairCostTotal:opp.repairCostTotal || Math.round(arv * 0.22),
           marketModifier: opp.marketModifier  || 0.70,
           wholesaleFee:   opp.wholesaleFee    || 12000,
-          mao:            opp.mao             || Math.round((arv * 0.70) - (arv * 0.40) - 12000),
+          mao:            opp.mao             || Math.round((arv * 0.70) - (arv * 0.22) - 12000),
           targetOffer:    opp.targetOffer     || opp.mao,
           dealStatus:     opp.dealStatus      || 'DEAL SPREAD ACCEPTED',
           equity,
@@ -361,16 +368,16 @@ async function step2b_fetchMLSListings(zipCodes) {
           mlsNumber:      opp.mlsNumber       || null,
           zillowUrl:      opp.zillowUrl       || null,
           redfinUrl:      opp.redfinUrl       || null,
-          dataSource:     opp.dataSource      || 'live',
+          dataSource:     'ai-estimate',
         });
       }
-      addLog(`✓ ${listed.length} on-market listings added for ${zipInfo.city}`);
+      addLog(`✓ ${listed.length} AI-generated on-market profiles for ${zipInfo.city}`);
     } catch (err) {
-      addLog(`MLS fetch failed for ${zipInfo.city}: ${err.message}`, 'warn');
+      addLog(`Step 2b failed for ${zipInfo.city}: ${err.message}`, 'warn');
     }
   }
 
-  addLog(`Step 2b complete: ${mlsLeads.length} on-market listings total`);
+  addLog(`Step 2b complete: ${mlsLeads.length} on-market profiles (AI, no RentCast calls)`);
   return mlsLeads;
 }
 

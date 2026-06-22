@@ -451,25 +451,55 @@ All prices in USD integers. Use zip codes and street names realistic for ${marke
  * listed    → real MLS listings from RentCast (when key available) OR AI estimates
  * offMarket → AI-identified lead targets (clearly labelled, no fake addresses)
  */
+// 24-hour in-memory cache — prevents duplicate RentCast charges when the
+// same location is searched more than once in a day.
+const _rentcastCache = new Map();
+const CACHE_TTL_MS   = 24 * 60 * 60 * 1000;
+
+// Simple monthly call counter — logs a warning when approaching the free limit.
+let _rentcastCallsThisMonth = 0;
+let _rentcastCounterMonth   = new Date().getMonth();
+const RENTCAST_MONTHLY_WARN = 40; // warn at 40, hard-stop at 48
+
+function _trackRentcastCall() {
+  const m = new Date().getMonth();
+  if (m !== _rentcastCounterMonth) { _rentcastCallsThisMonth = 0; _rentcastCounterMonth = m; }
+  _rentcastCallsThisMonth++;
+  if (_rentcastCallsThisMonth >= 48) {
+    throw new Error(`RentCast monthly limit guard: ${_rentcastCallsThisMonth} calls used — pausing to protect your quota. Resets next month.`);
+  }
+  if (_rentcastCallsThisMonth >= RENTCAST_MONTHLY_WARN) {
+    console.warn(`[RentCast] ⚠ ${_rentcastCallsThisMonth} calls used this month — approaching free-tier limit of 50.`);
+  }
+}
+
 async function getOpportunities(location) {
   let listed = [];
 
   if (hasRentcast()) {
-    try {
-      console.log(`[Listings] Fetching real listings from RentCast for: ${location}`);
-      const raw = await fetchRentcastListings(location);
-
-      // Sort by wholesale score, take top 6
-      listed = raw
-        .filter(l => l.price > 0)
-        .sort((a, b) => wholesaleScore(b) - wholesaleScore(a))
-        .slice(0, 6)
-        .map(mapListingToOpportunity);
-
-      console.log(`[Listings] Got ${listed.length} real listings from RentCast`);
-    } catch (err) {
-      console.error('[Listings] RentCast error:', err.message);
-      // Fall through to AI fallback below
+    // Serve from cache if fresh (avoids duplicate charges for repeated searches)
+    const cacheKey = location.toLowerCase().trim();
+    const cached   = _rentcastCache.get(cacheKey);
+    if (cached && Date.now() < cached.expires) {
+      console.log(`[Listings] Serving RentCast data from cache for: ${location}`);
+      listed = cached.data;
+    } else {
+      try {
+        _trackRentcastCall();
+        console.log(`[Listings] Fetching real listings from RentCast for: ${location} (call #${_rentcastCallsThisMonth} this month)`);
+        const raw = await fetchRentcastListings(location);
+        listed = raw
+          .filter(l => l.price > 0)
+          .sort((a, b) => wholesaleScore(b) - wholesaleScore(a))
+          .slice(0, 6)
+          .map(mapListingToOpportunity);
+        console.log(`[Listings] Got ${listed.length} real listings from RentCast`);
+        // Cache the result for 24 hours
+        _rentcastCache.set(cacheKey, { data: listed, expires: Date.now() + CACHE_TTL_MS });
+      } catch (err) {
+        console.error('[Listings] RentCast error:', err.message);
+        // Fall through to AI fallback below
+      }
     }
   }
 
@@ -483,4 +513,4 @@ async function getOpportunities(location) {
   return { listed, offMarket };
 }
 
-module.exports = { getOpportunities, buildZillowUrl, buildRedfinUrl, hasRentcast };
+module.exports = { getOpportunities, buildAIListedFallback, buildZillowUrl, buildRedfinUrl, hasRentcast };
